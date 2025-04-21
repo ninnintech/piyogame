@@ -1,0 +1,18 @@
+{
+  "name": "bird-garden-3d",
+  "version": "1.0.0",
+  "description": "3D箱庭を鳥が自由に飛び回るブラウザゲーム",
+  "scripts": {
+    "start": "npx serve ./public"
+  },
+  "dependencies": {
+    "ably": "^2.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  },
+  "main": "server.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

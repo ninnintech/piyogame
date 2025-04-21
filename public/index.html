@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D箱庭バードガーデン</title>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; }
+    #game-canvas { width: 100vw; height: 100vh; display: block; }
+    #info { position: absolute; top: 10px; left: 10px; color: #fff; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 8px; font-family: sans-serif; z-index: 10; }
+    #mobile-move-controls {
+      position: absolute;
+      left: 2vw;
+      bottom: 3vh;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      user-select: none;
+    }
+    #mobile-action-controls {
+      position: absolute;
+      right: 2vw;
+      bottom: 3vh;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      user-select: none;
+      align-items: flex-end;
+    }
+    #mobile-move-controls .row, #mobile-action-controls .row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    #mobile-move-controls button, #mobile-action-controls button {
+      width: 56px;
+      height: 56px;
+      font-size: 20px;
+      border-radius: 16px;
+      border: none;
+      background: rgba(255,255,255,0.85);
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+      font-weight: bold;
+      touch-action: manipulation;
+      position: relative;
+    }
+    #btn-dash {
+      width: 70px;
+      height: 70px;
+      font-size: 16px;
+      background: linear-gradient(135deg, #fff 75%, #ffe066 100%);
+      color: #d2691e;
+    }
+    #dash-gauge-bg {
+      display: block;
+      width: 48px;
+      height: 10px;
+      background: #eee;
+      border-radius: 5px;
+      margin: 4px auto 0 auto;
+      overflow: hidden;
+      position: relative;
+    }
+    #dash-gauge {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #ff9800 0%, #ffe066 100%);
+      border-radius: 5px;
+      transition: width 0.15s;
+    }
+    /* @media (min-width: 900px) {
+      #mobile-move-controls, #mobile-action-controls { display: none; }
+    } */
+    #login-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #login-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 32px 24px 24px 24px;
+      min-width: 240px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.19);
+      text-align: center;
+      font-family: sans-serif;
+    }
+    #login-box input, #login-box select {
+      width: 80%;
+      font-size: 18px;
+      margin-top: 5px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      padding: 4px 8px;
+    }
+    #login-btn {
+      margin-top: 16px;
+      width: 70%;
+      font-size: 18px;
+      background: #ffe066;
+      color: #a67c00;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 0;
+      font-weight: bold;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+    }
+  </style>
+  <script>
+    // Netlifyビルド時に環境変数から埋め込む（例: process.env.ABLY_KEY）
+    window.ABLY_KEY = "${ABLY_KEY}";
+  </script>
+  <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+</head>
+<body>
+  <audio id="bgm-audio" src="bgm.mp3" preload="auto" loop></audio>
+  <div id="info">WASD/矢印キー：移動・旋回　Space：上昇　Shift：下降　<span style="margin-left:2em; font-weight:bold; color:#d2691e;">スコア: <span id="score">0</span></span>　<span id="life" style="margin-left:2em; font-weight:bold; color:#e57373;">ライフ: 0</span>　<span id="active-users" style="margin-left:2em; font-weight:bold; color:#64b5f6;">アクティブユーザー数: 1</span></div>
+  <canvas id="game-canvas"></canvas>
+  <!-- 効果音・BGM用オーディオ要素 -->
+  <audio id="coin-audio" src="coin.mp3" preload="auto"></audio>
+  <audio id="shot-audio" src="shot.mp3" preload="auto"></audio>
+  <audio id="dash-audio" src="dash.mp3" preload="auto"></audio>
+  <audio id="bakuha-audio" src="bakuha.mp3" preload="auto"></audio>
+  <audio id="uke-audio" src="uke.mp3" preload="auto"></audio>
+  <audio id="hit-audio" src="hit.mp3" preload="auto"></audio>
+  <!-- 消滅サウンド -->
+  <audio id="metu-audio" src="metu.mp3" preload="auto"></audio>
+  <div id="mobile-move-controls">
+    <div class="row">
+      <button id="btn-up">↑</button>
+    </div>
+    <div class="row">
+      <button id="btn-left">←</button>
+      <button id="btn-forward">前進</button>
+      <button id="btn-right">→</button>
+    </div>
+    <div class="row">
+      <button id="btn-down">↓</button>
+    </div>
+  </div>
+  <div id="mobile-action-controls">
+    <div class="row">
+      <button id="btn-missile">ミサイル</button>
+    </div>
+    <div class="row">
+      <button id="btn-dash"><span id="dash-label">突撃</span><br><span id="dash-gauge-bg"><span id="dash-gauge"></span></span></button>
+    </div>
+  </div>
+  <div id="login-modal">
+    <div id="login-box">
+      <h2>ログイン</h2>
+      <label>ユーザー名<br><input id="login-name" maxlength="12" autocomplete="off" /></label>
+      <label style="margin-top:10px;">ひよこの色<br>
+        <select id="login-color">
+          <option value="#ffff66">黄色</option>
+          <option value="#ffb347">オレンジ</option>
+          <option value="#ffe4e1">ピンク</option>
+          <option value="#b0e0e6">水色</option>
+          <option value="#c1ffb3">みどり</option>
+          <option value="#e6e6fa">むらさき</option>
+        </select>
+      </label>
+      <button id="login-btn">ゲーム開始</button>
+    </div>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
