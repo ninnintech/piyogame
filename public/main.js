@@ -1328,7 +1328,7 @@ function handlePlayerHit(targetId, attackerId = null) {
         }
         // AblyでHP変更を通知 (自分のHPが変わったことを伝える)
         if (channel) {
-            channel.publish('hp_update', { id: myId, hp: hp, score: score }); // スコアも一緒に送る
+             channel.publish('hp_update', { id: myId, hp: hp, score: score }); // スコアも一緒に送る
         }
     } else if (peers[targetId]) {
         // 他プレイヤーの被弾処理 (HP減少は 'hp_update' 受信時に行う)
@@ -1578,7 +1578,7 @@ async function initAbly() {
         // ▼▼▼ myId をここで生成し、グローバル変数に設定 ▼▼▼
         myId = 'player_' + Math.random().toString(36).slice(2, 11); // グローバル変数 myId に設定
         // ▲▲▲ myId をここで生成し、グローバル変数に設定 ▲▲▲
-        const authUrl = `<span class="math-inline">\{apiBase\}/api/token?clientId\=</span>{encodeURIComponent(myId)}`; // 生成した myId を使う
+        const authUrl = `${apiBase}/api/token?clientId=${encodeURIComponent(myId)}`; // ← 修正
         console.log(`[initAbly] Generated My ID: ${myId}`); // ID確認用ログ
         return new Ably.Realtime({
             authUrl: authUrl,
@@ -1839,8 +1839,7 @@ function startGame() {
         requestAnimationFrame(animate); // 接続後にアニメーション開始
     }).catch(err => {
         console.error("Ably接続プロセスエラー:", err);
-        // alert は initAbly 内で出る可能性があるので、ここではログのみでも良いかも
-        // alert("オンライン接続に失敗しました。");
+        alert("オンライン接続に失敗しました。詳細: " + err);
         // オフラインモードやエラー表示など
         // requestAnimationFrame(animate); // エラーでもゲームループを開始する場合
     });
@@ -1985,6 +1984,7 @@ function showLogin() {
 
     loginModal.style.display = 'flex';
 
+    loginBtn.onclick = null; // 多重登録防止
     loginBtn.onclick = () => {
         const name = nameInput.value.trim();
         const color = colorInput.value;
@@ -2307,4 +2307,5 @@ function updateUIElements() {
 
 function renderScene() {
     renderer.render(scene, camera);
+}
 }
