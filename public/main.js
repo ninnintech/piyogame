@@ -1677,6 +1677,63 @@ for (const [mid, m] of Object.entries(allMissiles)) {
   }
 }
 
+// --- 他プレイヤーの体力が0になった時にランダムな場所へリスポーンし、消滅時に花火エフェクトを表示するように修正。handlePeerHit関数を追加し、オンライン同期ミサイルの処理部分で他プレイヤー撃墜時に呼び出すようにした。 ---
+function handlePeerHit(peerId, attackerId) {
+  const peer = peers[peerId];
+  if (!peer || !peer.group) return;
+  peer.hp = (typeof peer.hp === 'number' ? peer.hp : 5) - 1;
+  updateHeartDisplay(peer, peer.hp);
+  // ヒットエフェクトは省略可
+  if (peer.hp <= 0) {
+    // 消滅エフェクト（花火）
+    spawnFireworkEffect(peer.group.position);
+    peer.group.visible = false;
+    setTimeout(() => {
+      // ランダムリスポーン
+      let x, y, z, tries = 0;
+      do {
+        x = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
+        z = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
+        y = getTerrainHeight(x, z) + 7 + Math.random() * 6;
+        tries++;
+      } while (tries < 10 && checkCollision(new THREE.Vector3(x, y, z), 2).collided);
+      peer.group.position.set(x, y, z);
+      peer.hp = 5;
+      updateHeartDisplay(peer, peer.hp);
+      peer.group.visible = true;
+    }, 1800);
+  }
+}
+
+// --- オンライン同期ミサイルの移動 ---
+for (const [mid, m] of Object.entries(allMissiles)) {
+  m.mesh.position.addScaledVector(m.dir, 1.5);
+  m.life++;
+  if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 2.4 && hp > 0) {
+    // channel.publish('hit', { targetId: myId });
+    scene.remove(m.mesh);
+    delete allMissiles[mid];
+    handlePlayerHit(myId); // 自分が撃墜された時の処理を呼び出す
+    continue;
+  }
+  if (m.ownerId === myId) {
+    for (const pid in peers) {
+      const peer = peers[pid];
+      if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 2.4) {
+        // channel.publish('hit', { targetId: pid });
+        scene.remove(m.mesh);
+        delete allMissiles[mid];
+        handlePeerHit(pid, myId); // 他プレイヤー撃墜処理
+        break;
+      }
+    }
+  }
+  if (m.life > 60) {
+    scene.remove(m.mesh);
+    delete allMissiles[mid];
+  }
+}
+
 // --- コイン ---
 function spawnCoin() {
   // マップ全体にコインを散りばめる
