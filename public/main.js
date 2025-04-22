@@ -444,15 +444,20 @@ function checkAllChickenHits() {
     const missile = allMissiles[missileId];
     if (!missile || !missile.mesh || missile.life <= 0) continue;
     for (const chicken of chickens) {
-      if (missile.mesh.position.distanceTo(chicken.position) < 5.0) {
+      const distance = missile.mesh.position.distanceTo(chicken.position);
+      console.log(`Missile ${missileId} at ${missile.mesh.position.toArray()} | Chicken at ${chicken.position.toArray()} | Distance: ${distance}`);
+      if (distance < 5.0) {
         score += chicken.userData.isGold ? 2 : 1;
         updateInfo();
         spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
         playBakuhaSound(); // 爆発音再生
-        respawnChicken(chicken);
+        scene.remove(chicken); // 鶏を一度消す
+        respawnChicken(chicken); // ランダム位置に再配置
+        scene.add(chicken); // 再度フィールドに追加
         // ミサイル消去
         scene.remove(missile.mesh);
         missile.life = 0;
+        delete allMissiles[missileId]; // 完全削除
         break;
       }
     }
@@ -466,6 +471,179 @@ function playBakuhaSound() {
     bakuhaAudio.currentTime = 0;
     bakuhaAudio.volume = 0.7;
     bakuhaAudio.play().catch(()=>{});
+  }
+}
+
+// --- 虹色チキン管理用 ---
+let rainbowChicken = null;
+let rainbowChickenTimeout = null;
+
+function createRainbowChicken() {
+  const chicken = new THREE.Group();
+  // 体
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(4.4, 18, 18),
+    new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 80 })
+  );
+  // 虹色グラデーション
+  body.material.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `
+        float hue = mod((vUv.y + vUv.x) * 1.5 + time * 0.04, 1.0);
+        vec3 rainbow = hsv2rgb(vec3(hue, 0.9, 1.0));
+        gl_FragColor.rgb = rainbow;
+        #include <dithering_fragment>
+      `
+    );
+  };
+  chicken.add(body);
+  // 頭
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(2.4, 14, 14),
+    new THREE.MeshLambertMaterial({ color: 0xffffff })
+  );
+  head.position.set(0, 3.2, 2.8);
+  chicken.add(head);
+  // くちばし
+  const beak = new THREE.Mesh(
+    new THREE.ConeGeometry(0.72, 2.0, 8),
+    new THREE.MeshLambertMaterial({ color: 0xff9933 })
+  );
+  beak.position.set(0, 2.8, 5.0);
+  chicken.add(beak);
+  // 羽
+  const leftWing = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 5.2, 8.8),
+    new THREE.MeshLambertMaterial({ color: 0xffffff })
+  );
+  leftWing.position.set(-4.4, 1.2, 0);
+  leftWing.rotation.z = Math.PI / 8;
+  chicken.add(leftWing);
+  const rightWing = leftWing.clone();
+  rightWing.position.set(4.4, 1.2, 0);
+  rightWing.rotation.z = -Math.PI / 8;
+  chicken.add(rightWing);
+  chicken.userData.isRainbow = true;
+  chicken.userData.type = 'rainbow';
+  chicken.userData.hp = 2;
+  chicken.userData.lastHitPlayer = null;
+  return chicken;
+}
+
+function spawnRainbowChicken() {
+  if (rainbowChicken) {
+    scene.remove(rainbowChicken);
+    rainbowChicken = null;
+  }
+  rainbowChicken = createRainbowChicken();
+  rainbowChicken.position.copy(randomChickenPosition());
+  scene.add(rainbowChicken);
+}
+
+function removeRainbowChicken() {
+  if (rainbowChicken) {
+    scene.remove(rainbowChicken);
+    rainbowChicken = null;
+  }
+}
+
+function scheduleRainbowChickenRespawn() {
+  if (rainbowChickenTimeout) clearTimeout(rainbowChickenTimeout);
+  rainbowChickenTimeout = setTimeout(() => {
+    spawnRainbowChicken();
+  }, 5 * 60 * 1000); // 5分後
+}
+
+// --- 鶏の移動関数修正 ---
+function moveChickenSlowly(chicken) {
+  // ゆっくり・ふわふわ飛び回る動き
+  if (!chicken.userData.basePos) {
+    chicken.userData.basePos = chicken.position.clone();
+    chicken.userData.phase = Math.random() * Math.PI * 2;
+    chicken.userData.radius = 55 + Math.random() * 60;
+    // 通常の鶏はさらに遅く
+    chicken.userData.speed = chicken.userData.isRainbow ? 0.00013 + Math.random() * 0.00007 : 0.00015 + Math.random() * 0.00009;
+    chicken.userData.height = 38 + Math.random() * 20;
+  }
+  const now = performance.now();
+  chicken.position.x = chicken.userData.basePos.x + Math.cos(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.z = chicken.userData.basePos.z + Math.sin(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.y = chicken.userData.height + Math.sin(now * 0.0008 + chicken.userData.phase) * 7;
+  chicken.rotation.y = Math.PI/2 - (now * chicken.userData.speed + chicken.userData.phase);
+}
+
+// --- 鶏の当たり判定修正 ---
+function checkAllChickenHits() {
+  for (const missileId in allMissiles) {
+    const missile = allMissiles[missileId];
+    if (!missile || !missile.mesh || missile.life <= 0) continue;
+    // 通常鶏
+    for (let i = chickens.length - 1; i >= 0; i--) {
+      const chicken = chickens[i];
+      const distance = missile.mesh.position.distanceTo(chicken.position);
+      if (distance < 5.0) {
+        score += chicken.userData.isGold ? 2 : 1;
+        updateInfo();
+        spawnChickenEffect(chicken.position, chicken.userData.isGold);
+        playBakuhaSound();
+        scene.remove(chicken);
+        chickens.splice(i, 1);
+        // 再出現
+        setTimeout(() => {
+          const newChicken = createChicken(chicken.userData.isGold);
+          newChicken.position.copy(randomChickenPosition());
+          chickens.push(newChicken);
+          scene.add(newChicken);
+          addCollisionObject(newChicken, 4);
+        }, 800);
+        // ミサイル消去
+        scene.remove(missile.mesh);
+        missile.life = 0;
+        delete allMissiles[missileId];
+        break;
+      }
+    }
+    // 虹色チキン
+    if (rainbowChicken) {
+      const distance = missile.mesh.position.distanceTo(rainbowChicken.position);
+      if (distance < 7.0) {
+        rainbowChicken.userData.hp--;
+        rainbowChicken.userData.lastHitPlayer = myId; // 最後に当てたプレイヤー
+        spawnChickenEffect(rainbowChicken.position, false);
+        playBakuhaSound();
+        scene.remove(missile.mesh);
+        missile.life = 0;
+        delete allMissiles[missileId];
+        if (rainbowChicken.userData.hp <= 0) {
+          // 5ポイント加算
+          if (rainbowChicken.userData.lastHitPlayer === myId) {
+            score += 5;
+            updateInfo();
+          }
+          // 消滅＆5分後に再出現
+          removeRainbowChicken();
+          scheduleRainbowChickenRespawn();
+        }
+        break;
+      }
+    }
+  }
+}
+
+// --- ゲーム開始時に虹色チキンをまれに出現 ---
+function spawnGameObjects() {
+  for (const c of coins) scene.remove(c);
+  coins.length = 0;
+  for (const c of chickens) scene.remove(c);
+  chickens.length = 0;
+  spawnCoinsAtSky(16);
+  spawnChickens();
+  // まれに虹色チキン
+  if (Math.random() < 0.07) {
+    spawnRainbowChicken();
+  } else {
+    scheduleRainbowChickenRespawn();
   }
 }
 
@@ -927,7 +1105,7 @@ function sendState() {
     score
   });
 }
-setInterval(sendState, 40);
+setInterval(sendState, 100);
 
 // --- サブスクライブ: 他プレイヤーの状態反映 ---
 // channel.subscribe('state', (msg) => {
@@ -991,6 +1169,7 @@ function startGame() {
   // 鳥の色を反映
   setBirdColor(bird, myColor);
   createNameObj(bird, myName);
+  spawnGameObjects(); // ゲーム開始時にコイン＆鶏を必ず出現させる
   try {
     const result = setupRealtimeConnection();
     if (result && typeof result.then === 'function') {
@@ -1076,38 +1255,59 @@ function startGame() {
 // }
 
 // --- 左右分割ボタン初期化 ---
-function setupMobileControls() {
-  // 左（移動）
-  const btnF = document.getElementById('btn-forward');
-  const btnL = document.getElementById('btn-left');
-  const btnR = document.getElementById('btn-right');
-  const btnU = document.getElementById('btn-up');
-  const btnD = document.getElementById('btn-down');
-  // 右（アクション）
-  const btnM = document.getElementById('btn-missile');
-  const btnDash = document.getElementById('btn-dash');
-  // タッチ/マウス両対応
-  function press(btn, on, off) {
-    btn.addEventListener('touchstart', e => { e.preventDefault(); on(); });
-    btn.addEventListener('mousedown', on);
-    btn.addEventListener('touchend', off);
-    btn.addEventListener('mouseup', off);
-    btn.addEventListener('mouseleave', off);
+// 削除
+
+// --- バーチャルジョイスティック（nipplejs） ---
+import 'https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js';
+
+window.addEventListener('DOMContentLoaded', () => {
+  // ジョイスティック初期化
+  const joystick = nipplejs.create({
+    zone: document.getElementById('joystick-zone'),
+    mode: 'static',
+    position: { left: '60px', bottom: '60px' },
+    color: 'blue',
+    size: 110
+  });
+  joystick.on('move', (evt, data) => {
+    if (data && data.vector) {
+      // x: -1(左)～1(右) → 左右旋回
+      // y: -1(上)～1(下) → 上昇/下降
+      move.turn = data.vector.x;
+      move.up = -data.vector.y;
+    }
+  });
+  joystick.on('end', () => {
+    move.turn = 0;
+    move.up = 0;
+  });
+
+  // 新しいボタン構成に対応
+  const fbtn = document.getElementById('forward-btn');
+  const missileBtn = document.getElementById('missile-btn');
+  const dashBtn = document.getElementById('dash-btn');
+
+  // 前進ボタン
+  if (fbtn) {
+    fbtn.addEventListener('touchstart', () => move.forward = 1);
+    fbtn.addEventListener('touchend', () => move.forward = 0);
+    fbtn.addEventListener('mousedown', () => move.forward = 1);
+    fbtn.addEventListener('mouseup', () => move.forward = 0);
+    fbtn.addEventListener('mouseleave', () => move.forward = 0);
   }
-  press(btnF, () => move.forward = 1, () => move.forward = 0);
-  press(btnL, () => move.turn = -1, () => move.turn = 0);
-  press(btnR, () => move.turn = 1, () => move.turn = 0);
-  press(btnU, () => move.up = 1, () => move.up = 0);
-  press(btnD, () => move.up = -1, () => move.up = 0);
-  if (btnM) {
-    btnM.addEventListener('touchstart', fireMissile);
-    btnM.addEventListener('mousedown', fireMissile);
+
+  // ミサイルボタン
+  if (missileBtn) {
+    missileBtn.addEventListener('touchstart', fireMissile);
+    missileBtn.addEventListener('mousedown', fireMissile);
   }
+
   // 突撃ボタン
-  btnDash.addEventListener('touchstart', startDash);
-  btnDash.addEventListener('mousedown', startDash);
-}
-window.addEventListener('DOMContentLoaded', setupMobileControls);
+  if (dashBtn) {
+    dashBtn.addEventListener('touchstart', startDash);
+    dashBtn.addEventListener('mousedown', startDash);
+  }
+});
 
 // --- 突撃ゲージ ---
 let dashGauge = 1.0; // 0.0〜1.0
@@ -1179,9 +1379,6 @@ function updateInfo() {
   if (infoDiv) {
     infoDiv.innerHTML = `スコア: <b>${score}</b>　体力: <b>${hp}</b> / ${maxHP}<br>アクティブユーザー: <b>${userCount}</b><br>WASD/矢印キー：移動・旋回　Space：上昇　Shift：下降`;
   }
-  
-  // スコア更新時にランキングも更新
-  updateLocalRanking();
 }
 
 // --- 右上ランキング表示用divを追加 ---
@@ -1457,19 +1654,6 @@ for (const [mid, m] of Object.entries(allMissiles)) {
   }
 }
 
-// --- 鶏の羽ばたきアニメーション ---
-function animateChickenWings(nowRaw) {
-  if (!Array.isArray(chickens)) return;
-  const time = nowRaw * 0.003;
-  chickens.forEach(chicken => {
-    // chicken.leftWing, chicken.rightWing が存在する場合のみ
-    if (chicken.leftWing && chicken.rightWing) {
-      chicken.leftWing.rotation.z = Math.sin(time) * 0.7;
-      chicken.rightWing.rotation.z = -Math.sin(time) * 0.7;
-    }
-  });
-}
-
 // --- コイン ---
 function spawnCoin() {
   // マップ全体にコインを散りばめる
@@ -1502,7 +1686,7 @@ function spawnCoin() {
       mesh.receiveShadow = false;
       coins.push(mesh);
       scene.add(mesh);
-      addCollisionObject(mesh, 2); // 衝突判定用のオブジェクトを追加
+      // addCollisionObject(mesh, 2); // コインは衝突判定に追加しない
       placed = true;
     }
     tryCount++;
@@ -1513,12 +1697,15 @@ function spawnCoin() {
 function checkCoinCollision() {
   for (let i = coins.length - 1; i >= 0; i--) {
     const c = coins[i];
-    if (bird.position.distanceTo(c.position) < 3.2) { // 判定半径調整
+    const distance = bird.position.distanceTo(c.position);
+    console.log(`Player at ${bird.position.toArray()} | Coin at ${c.position.toArray()} | Distance: ${distance}`);
+    if (distance < 3.2) {
       coins.splice(i, 1);
       scene.remove(c);
       score++;
       updateInfo();
       playCoinSound && playCoinSound();
+      spawnCoin(); // 新たなコインを即出現
     }
   }
 }
@@ -1541,7 +1728,9 @@ function checkChickenHitByMissile(missile) {
       updateInfo();
       spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
       playBakuhaSound(); // 爆発音再生
-      respawnChicken(chicken);
+      scene.remove(chicken); // 鶏を一度消す
+      respawnChicken(chicken); // ランダム位置に再配置
+      scene.add(chicken); // 再度フィールドに追加
       // ミサイル消去
       scene.remove(missile.mesh);
       missile.life = 0;
@@ -1635,12 +1824,8 @@ if (channel) {
   });
 }
 
-
-
-
 function animate() {
   try {
-    console.log("[animate] start frame");
     // コイン演出
     const nowRaw = performance.now();
     const now = nowRaw * 0.002;
@@ -1785,39 +1970,118 @@ function animate() {
     // ローカルミサイルの移動
     updateLocalMissiles();
     checkAllChickenHits();
-    animateChickenWings(nowRaw);
+    // 鶏の移動
+    for (const chicken of chickens) {
+      moveChickenSlowly(chicken);
+    }
     updateMyNameObjPosition();
     Object.values(peers).forEach(updateNameObjPosition);
-    Object.values(peers).forEach(peer => {
-      updatePeerHeartDisplay(peer, peer.hp);
-    });
+    // Object.values(peers).forEach(peer => {
+    //   updatePeerHeartDisplay(peer, peer.hp);
+    // });
     checkCoinCollision();
     checkPlayerHitByMissile(); // 追加
     renderer.render(scene, camera);
-    // --- フレーム終了ログ
-    console.log("[animate] end frame");
   } catch (e) {
-    console.error("[animate] エラー発生:", e);
-    // エラー内容を画面にも表示
-    let errDiv = document.getElementById('error-log');
-    if (!errDiv) {
-      errDiv = document.createElement('div');
-      errDiv.id = 'error-log';
-      errDiv.style.position = 'fixed';
-      errDiv.style.bottom = '10px';
-      errDiv.style.left = '10px';
-      errDiv.style.background = 'rgba(255,0,0,0.85)';
-      errDiv.style.color = '#fff';
-      errDiv.style.padding = '12px 24px';
-      errDiv.style.zIndex = 9999;
-      errDiv.style.fontSize = '16px';
-      errDiv.style.borderRadius = '8px';
-      document.body.appendChild(errDiv);
+    if (!animate.lastError || animate.lastError !== String(e)) {
+      animate.lastError = String(e);
+      console.error("[animate] エラー発生:", e);
+      // エラー内容を画面にも表示
+      let errDiv = document.getElementById('error-log');
+      if (!errDiv) {
+        errDiv = document.createElement('div');
+        errDiv.id = 'error-log';
+        errDiv.style.position = 'fixed';
+        errDiv.style.bottom = '10px';
+        errDiv.style.left = '10px';
+        errDiv.style.background = 'rgba(255,0,0,0.85)';
+        errDiv.style.color = '#fff';
+        errDiv.style.padding = '12px 24px';
+        errDiv.style.zIndex = 9999;
+        errDiv.style.fontSize = '16px';
+        errDiv.style.borderRadius = '8px';
+        document.body.appendChild(errDiv);
+      }
+      errDiv.textContent = '[animate] エラー: ' + (e && e.stack ? e.stack : e);
     }
-    errDiv.textContent = '[animate] エラー: ' + (e && e.stack ? e.stack : e);
   } finally {
     // ループが止まらないよう必ず次フレームを要求
     requestAnimationFrame(animate);
   }
 }
 animate();
+
+// --- コインを空中に均等配置する関数 ---
+function spawnCoinsAtSky(count = 16) {
+  // 空中にコインを均等配置
+  for (let i = 0; i < count; i++) {
+    let placed = false;
+    let tryCount = 0;
+    while (!placed && tryCount < 30) {
+      // 空の中央寄りエリアに配置
+      const angle = (i / count) * Math.PI * 2;
+      const radius = 120 + Math.random() * 90;
+      const x = Math.cos(angle) * radius + (Math.random() - 0.5) * 30;
+      const z = Math.sin(angle) * radius + (Math.random() - 0.5) * 30;
+      const y = 38 + Math.random() * 20;
+      let tooClose = false;
+      for (const c of coins) {
+        if (c.position.distanceTo(new THREE.Vector3(x, y, z)) < 16) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) {
+        const geometry = new THREE.TorusGeometry(2.0, 0.7, 32, 64);
+        geometry.scale(1, 1.8, 1);
+        const material = new THREE.MeshBasicMaterial({
+          color: 0xFFFF99,
+          transparent: true,
+          opacity: 0.93
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        mesh.rotation.x = Math.PI/2;
+        mesh.castShadow = true;
+        mesh.receiveShadow = false;
+        coins.push(mesh);
+        scene.add(mesh);
+        // addCollisionObject(mesh, 2); // コインは衝突判定に追加しない
+        placed = true;
+      }
+      tryCount++;
+    }
+  }
+}
+
+// --- ゲーム開始時にコインと鶏を必ず出現させる関数 ---
+function spawnGameObjects() {
+  // コイン・鶏を初期化し出現させる
+  // 既存オブジェクトを消去
+  for (const c of coins) scene.remove(c);
+  coins.length = 0;
+  for (const c of chickens) scene.remove(c);
+  chickens.length = 0;
+  // コイン
+  spawnCoinsAtSky(16);
+  // 鶏
+  spawnChickens();
+}
+
+// --- 鶏の移動関数 ---
+function moveChickenSlowly(chicken) {
+  // ゆっくり・ふわふわ飛び回る動き
+  if (!chicken.userData.basePos) {
+    chicken.userData.basePos = chicken.position.clone();
+    chicken.userData.phase = Math.random() * Math.PI * 2;
+    chicken.userData.radius = 55 + Math.random() * 60;
+    // 通常の鶏はさらに遅く
+    chicken.userData.speed = chicken.userData.isRainbow ? 0.00013 + Math.random() * 0.00007 : 0.00015 + Math.random() * 0.00009;
+    chicken.userData.height = 38 + Math.random() * 20;
+  }
+  const now = performance.now();
+  chicken.position.x = chicken.userData.basePos.x + Math.cos(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.z = chicken.userData.basePos.z + Math.sin(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.y = chicken.userData.height + Math.sin(now * 0.0008 + chicken.userData.phase) * 7;
+  chicken.rotation.y = Math.PI/2 - (now * chicken.userData.speed + chicken.userData.phase);
+}

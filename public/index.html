@@ -8,16 +8,6 @@
     body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; }
     #game-canvas { width: 100vw; height: 100vh; display: block; }
     #info { position: absolute; top: 10px; left: 10px; color: #fff; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 8px; font-family: sans-serif; z-index: 10; }
-    #mobile-move-controls {
-      position: absolute;
-      left: 2vw;
-      bottom: 3vh;
-      z-index: 20;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      user-select: none;
-    }
     #mobile-action-controls {
       position: absolute;
       right: 2vw;
@@ -29,12 +19,12 @@
       user-select: none;
       align-items: flex-end;
     }
-    #mobile-move-controls .row, #mobile-action-controls .row {
+    #mobile-action-controls .row {
       display: flex;
       gap: 8px;
       justify-content: center;
     }
-    #mobile-move-controls button, #mobile-action-controls button {
+    #mobile-action-controls button {
       width: 56px;
       height: 56px;
       font-size: 20px;
@@ -125,6 +115,21 @@
   <audio id="bgm-audio" src="bgm.mp3" preload="auto" loop></audio>
   <div id="info">WASD/矢印キー：移動・旋回　Space：上昇　Shift：下降　<span style="margin-left:2em; font-weight:bold; color:#d2691e;">スコア: <span id="score">0</span></span>　<span id="life" style="margin-left:2em; font-weight:bold; color:#e57373;">ライフ: 0</span>　<span id="active-users" style="margin-left:2em; font-weight:bold; color:#64b5f6;">アクティブユーザー数: 1</span></div>
   <canvas id="game-canvas"></canvas>
+  <!-- バーチャルジョイスティック用 -->
+  <div id="joystick-zone" style="position:fixed;left:2vw;bottom:3vh;width:120px;height:120px;z-index:20;"></div>
+  <!-- 右下アクションボタン（縦並び） -->
+  <!-- <div id="mobile-action-controls" style="position:fixed;right:5vw;bottom:18vh;z-index:20;display:flex;flex-direction:column;gap:16px;align-items:flex-end;">
+    <button id="missile-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#e3f2fd;color:#1565c0;font-weight:bold;">ミサイル</button>
+    <button id="dash-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#ffe0b2;color:#e65100;font-weight:bold;">突撃</button>
+  </div> -->
+  <!-- 前進＋アクションボタン縦並び配置 -->
+  <div id="mobile-move-action-controls" style="position:fixed;right:5vw;bottom:6vh;z-index:20;display:flex;flex-direction:row;align-items:flex-end;gap:12px;">
+    <button id="forward-btn" style="width:80px;height:80px;border-radius:40px;font-size:22px;background:#fffbe6;color:#333;box-shadow:0 2px 8px rgba(0,0,0,0.18);font-weight:bold;">前進</button>
+    <div style="display:flex;flex-direction:column;gap:14px;align-items:center;">
+      <button id="missile-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#e3f2fd;color:#1565c0;font-weight:bold;">ミサイル</button>
+      <button id="dash-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#ffe0b2;color:#e65100;font-weight:bold;">突撃</button>
+    </div>
+  </div>
   <!-- 効果音・BGM用オーディオ要素 -->
   <audio id="coin-audio" src="coin.mp3" preload="auto"></audio>
   <audio id="shot-audio" src="shot.mp3" preload="auto"></audio>
@@ -134,27 +139,6 @@
   <audio id="hit-audio" src="hit.mp3" preload="auto"></audio>
   <!-- 消滅サウンド -->
   <audio id="metu-audio" src="metu.mp3" preload="auto"></audio>
-  <div id="mobile-move-controls">
-    <div class="row">
-      <button id="btn-up">↑</button>
-    </div>
-    <div class="row">
-      <button id="btn-left">←</button>
-      <button id="btn-forward">前進</button>
-      <button id="btn-right">→</button>
-    </div>
-    <div class="row">
-      <button id="btn-down">↓</button>
-    </div>
-  </div>
-  <div id="mobile-action-controls">
-    <div class="row">
-      <button id="btn-missile">ミサイル</button>
-    </div>
-    <div class="row">
-      <button id="btn-dash"><span id="dash-label">突撃</span><br><span id="dash-gauge-bg"><span id="dash-gauge"></span></span></button>
-    </div>
-  </div>
   <div id="login-modal">
     <div id="login-box">
       <h2>ログイン</h2>
