@@ -1606,6 +1606,43 @@ for (const [mid, m] of Object.entries(allMissiles)) {
   }
 }
 
+// --- NPC（空を飛ぶ鳥・虫） ---
+function spawnNPC() {
+  const t = NPC_TYPES[Math.random() < 0.5 ? 0 : 1];
+  let mesh;
+  if (t.type === 'bird') {
+    mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7 * t.scale, 10, 8),
+      new THREE.MeshLambertMaterial({ color: t.color })
+    );
+  } else {
+    mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.35, 8, 6),
+      new THREE.MeshLambertMaterial({ color: t.color })
+    );
+  }
+  mesh.position.set(
+    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9,
+    6 + Math.random() * 20,
+    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9
+  );
+  mesh.userData = {
+    type: t.type,
+    dir: new THREE.Vector3(
+      (Math.random() - 0.5) * 0.6,
+      (Math.random() - 0.5) * 0.12,
+      (Math.random() - 0.5) * 0.6
+    ).normalize(),
+    speed: 0.1 + Math.random() * 0.15
+  };
+  npcs.push(mesh);
+  scene.add(mesh);
+  addCollisionObject(mesh, 2); // 衝突判定用のオブジェクトを追加
+}
+function maintainNPCs() {
+  while (npcs.length < 15) spawnNPC();
+}
+
 // --- コイン ---
 function spawnCoin() {
   // マップ全体にコインを散りばめる
