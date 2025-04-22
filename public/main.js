@@ -2005,10 +2005,19 @@ function showLogin() {
 
 // --- イベントリスナー ---
 window.addEventListener('DOMContentLoaded', () => {
-    showLogin(); // ログイン画面表示から開始
-    startBGM(); // BGM再生準備
+    try {
+        showLogin();
+    } catch (e) {
+        console.error("ログイン画面の初期化エラー:", e);
+    }
 });
-
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        showLogin();
+    } catch (e) {
+        console.error("ログイン画面の初期化エラー:", e);
+    }
+});
 window.addEventListener('resize', () => {
     if (camera && renderer) {
         camera.aspect = window.innerWidth / window.innerHeight;
