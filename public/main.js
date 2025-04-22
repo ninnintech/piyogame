@@ -2185,5 +2185,15 @@ async function startGame() {
     if (bgm && bgm.paused) {
         bgm.play().catch(()=>{});
     }
+
+    // Three.jsグラフィックス初期化（必ず呼ぶ）
+    if (typeof initGraphics === 'function') {
+        initGraphics();
+    }
+
+    // アニメーションループ開始（必ず呼ぶ）
+    if (typeof animate === 'function') {
+        requestAnimationFrame(animate);
+    }
 }
 window.startGame = startGame;
