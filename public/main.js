@@ -1097,7 +1097,7 @@ setInterval(sendState, 100);
 //   // HP/スコア
 //   if (typeof msg.hp === 'number') peer.hp = msg.hp;
 //   if (typeof msg.score === 'number') peer.score = msg.score;
-// });
+});
 
 // --- ミサイル発射 ---
 function fireMissile() {
