@@ -1,5 +1,41 @@
-// --- Three.jsグラフィックス初期化 ---
+// --- グローバル変数宣言 ---
 let scene, camera, renderer, canvas;
+let move = { forward: 0, turn: 0, up: 0 };
+let myId = null;
+let myName = '';
+let myColor = '';
+let bird = null;
+let hp = 0;
+let score = 0;
+let MAX_HP = 5;
+let channel = null;
+let ably = null;
+// 必要に応じて他のグローバルも追加
+
+// --- 必須: ダミー初期化関数（ゲーム進行に必要な場合） ---
+// 本来は個別ファイルや詳細な処理が必要ですが、
+// ここでは最低限エラーを防ぐためのダミー関数を追加します。
+if (typeof createTerrain !== 'function') {
+    function createTerrain() {
+        // TODO: 地形生成の詳細実装
+        console.warn('createTerrain() is a dummy. Implement actual terrain logic.');
+    }
+}
+if (typeof placeObjects !== 'function') {
+    function placeObjects() {
+        // TODO: オブジェクト配置の詳細実装
+        console.warn('placeObjects() is a dummy. Implement actual object placement logic.');
+    }
+}
+if (typeof setupPlayerBird !== 'function') {
+    function setupPlayerBird() {
+        // TODO: プレイヤー鳥生成の詳細実装
+        console.warn('setupPlayerBird() is a dummy. Implement actual player bird logic.');
+    }
+}
+
+// --- Three.jsグラフィックス初期化 ---
+let TERRAIN_SIZE = 400; // 地形サイズ
 
 function initGraphics() {
     canvas = document.getElementById('game-canvas');
