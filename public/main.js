@@ -1602,6 +1602,8 @@ async function setupRealtimeConnection() {
     // Ablyが決定したclientIdでmyIdを上書き
     myId = ably.auth.clientId;
 
+    console.log(`My ID: ${myId}, Name: ${myName}, Color: ${myColor}`);
+
     // --- Presence (入退室管理) ---
     await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
     console.log("Presence Enter 完了");
@@ -1852,8 +1854,7 @@ function sendState() {
 // --- ゲームロジック ---
 
 function startGame() {
-    myId = ably.auth.clientId;
-    console.log(`My ID: ${myId}, Name: ${myName}, Color: ${myColor}`);
+    console.log(`My Name: ${myName}, Color: ${myColor}`);
 
     initGraphics();
     createTerrain();
