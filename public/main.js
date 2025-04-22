@@ -2005,7 +2005,7 @@ function removeDashEffect() {
         if (wingAngle > 0.7 || wingAngle < -0.7) wingDir *= -1;
         leftWing.rotation.x = wingAngle;
         rightWing.rotation.x = -wingAngle;
-    
+      } // ← この閉じ括弧 } を追加
     // 車の移動
     if (typeof cars !== 'undefined') {
       cars.forEach((car, i) => {
