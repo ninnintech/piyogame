@@ -32,10 +32,9 @@ exports.handler = async function(event, context) {
 
     // 5. トークンリクエストを作成 (async/await を使用)
     //    createTokenRequest は Promise を返すため await が使えます
-    const tokenRequest = await ably.auth.createTokenRequest({ clientId: clientId });
-    // 必要であれば、ここで capability (権限) を設定することもできます
-    // const tokenParams = { clientId: clientId, capability: { '*': ['publish', 'subscribe'] } };
-    // const tokenRequest = await ably.auth.createTokenRequest(tokenParams);
+    //    capability: { '*': ['publish', 'subscribe', 'presence'] } を明示的に付与
+    const tokenParams = { clientId: clientId, capability: { '*': ['publish', 'subscribe', 'presence'] } };
+    const tokenRequest = await ably.auth.createTokenRequest(tokenParams);
 
     console.log('Ably token request generated successfully.');
 
