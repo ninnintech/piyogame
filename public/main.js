@@ -1616,13 +1616,24 @@ async function setupRealtimeConnection() {
                 if (!member || typeof member !== 'object') continue;
                 if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
 
+                // Ably SDKのPresence.get()の戻り値が {clientId, data} でない場合の防御
+                if (!('data' in member) || !('clientId' in member)) {
+                    console.warn("Presenceメンバー形式が不正", member);
+                    continue;
+                }
+
                 const state = member.data; // Presence data を使う
-                if (!state) continue; // データがない場合はスキップ
+                if (!state || typeof state !== 'object') continue; // データがない/不正ならスキップ
+
+                if (!('id' in state)) {
+                    console.warn("Presence stateにidがありません", state);
+                    continue;
+                }
 
                 if (!peers[state.id]) { // 新規ピア
-                   console.log(`新規ピア参加: ${state.name}(${state.id})`);
-                   peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
-                   scene.add(peers[state.id].group);
+                    console.log(`新規ピア参加: ${state.name}(${state.id})`);
+                    peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
+                    scene.add(peers[state.id].group);
                 } else { // 既存ピアの情報更新
                     const peer = peers[state.id];
                     peer.group.position.set(state.x || 0, state.y || 10, state.z || 0); // 位置も同期？
@@ -1632,8 +1643,8 @@ async function setupRealtimeConnection() {
                     peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
                     peer.score = typeof state.score === 'number' ? state.score : 0;
                     if (peer.nameObj) {
-                         peer.nameObj.nameSpan.textContent = peer.name;
-                         updateHeartDisplay(peer.nameObj, peer.hp);
+                        peer.nameObj.nameSpan.textContent = peer.name;
+                        updateHeartDisplay(peer.nameObj, peer.hp);
                     }
                     peer.group.visible = peer.hp > 0; // HPが0なら非表示
                 }
@@ -1643,11 +1654,12 @@ async function setupRealtimeConnection() {
             // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
             // presenceにいなくなったがpeersに残っているピアを削除
             for (const oldPeerId of currentPeerIds) {
-                console.log(`ピア退出: ${peers[oldPeerId].name}(${oldPeerId})`);
-                removePeer(oldPeerId);
+                if (peers[oldPeerId]) {
+                    console.log(`ピア退出: ${peers[oldPeerId].name}(${oldPeerId})`);
+                    removePeer(oldPeerId);
+                }
             }
             updateRanking(); // ランキング更新
-
         } catch (err) {
             console.error("Presence情報の取得/更新エラー:", err);
         }
