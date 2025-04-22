@@ -1593,30 +1593,55 @@ async function initAbly(clientId) {
     }
 }
 
+async function setupRealtimeConnection() {
+    if (!ably) {
+        console.error("setupRealtimeConnection: Ablyインスタンスがありません。");
+        return;
+    }
+    channel = ably.channels.get('bird-garden-3d-v2');
 
+    // --- Presence (入退室管理) ---
+    try {
+        await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
+        console.log("Presence Enter 完了");
+    } catch (enterErr) {
+        console.error("Presence Enter エラー:", enterErr);
+    }
 
-showLogin 
-    // 初回取得 (少し待ってから呼ぶか、syncCompleteイベントを使う方が安全かも)
-    // await new Promise(resolve => setTimeout(resolve, 500)); // 0.5秒待つ例
+    // Presence情報取得・同期
+    const updatePresenceInfo = async () => {
+        try {
+            const members = await channel.presence.get();
+            if (!Array.isArray(members)) {
+                console.error("Presence情報の取得エラー: membersが配列ではありません", members);
+                userCount = 0;
+                updateInfo();
+                return;
+            }
+            userCount = members.length;
+            updateInfo();
+        } catch (err) {
+            console.error("Presence情報の取得/更新エラー:", err);
+        }
+    };
+
+    // Presence同期完了時の初回取得
     channel.presence.subscribe('syncComplete', async () => {
-       console.log("Presence同期完了！初回情報取得を実行します。");
-       await updatePresenceInfo();
+        console.log("Presence同期完了！初回情報取得を実行します。");
+        await updatePresenceInfo();
     });
-    // channel.presence.syncComplete が呼ばれないケースも考慮し、最初のattach後にも呼ぶ？
-    // await updatePresenceInfo(); // syncComplete を待つならこれは不要かも
 
-
-    // 定期的な Presence 情報で同期 (頻度を長くするのを推奨)
+    // 定期的な Presence 情報で同期
     setInterval(() => {
-         if (ably && ably.connection.state === 'connected' && channel && channel.state === 'attached') {
-              updatePresenceInfo();
-         }
-    }, 10000); // 10秒ごと
+        if (ably && ably.connection.state === 'connected' && channel && channel.state === 'attached') {
+            updatePresenceInfo();
+        }
+    }, 10000);
 
     // Presence イベントリスナー
     channel.presence.subscribe(['enter', 'leave', 'update'], (member) => {
         console.log(`Presenceイベント受信: ${member.action} - ${member.clientId}`);
-        updatePresenceInfo(); // イベント発生時もリスト全体を更新
+        updatePresenceInfo();
     });
 
     // --- メッセージ購読 ---
@@ -1772,128 +1797,6 @@ function sendState() {
         // name: myName,   // Presenceで同期
         // color: myColor  // Presenceで同期
     });
-}
-
-
-
-
-function setupInput() {
-    // キーボード入力
-    window.addEventListener('keydown', (e) => {
-        switch (e.code) {
-            case 'KeyW': case 'ArrowUp': move.forward = 1; break;
-            case 'KeyS': case 'ArrowDown': move.forward = -1; break;
-            case 'KeyA': case 'ArrowLeft': move.turn = -1; break;
-            case 'KeyD': case 'ArrowRight': move.turn = 1; break;
-            case 'Space': move.up = 1; break;
-            case 'ShiftLeft': case 'ShiftRight': move.up = -1; break;
-            case 'KeyX': if (hp > 0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3())); break;
-            case 'KeyZ': if (hp > 0) startDash(); break;
-        }
-    });
-    window.addEventListener('keyup', (e) => {
-        switch (e.code) {
-            case 'KeyW': case 'ArrowUp': if (move.forward === 1) move.forward = 0; break;
-            case 'KeyS': case 'ArrowDown': if (move.forward === -1) move.forward = 0; break;
-            case 'KeyA': case 'ArrowLeft': if (move.turn === -1) move.turn = 0; break;
-            case 'KeyD': case 'ArrowRight': if (move.turn === 1) move.turn = 0; break;
-            case 'Space': if (move.up === 1) move.up = 0; break;
-            case 'ShiftLeft': case 'ShiftRight': if (move.up === -1) move.up = 0; break;
-        }
-    });
-
-    // バーチャルジョイスティック (nipplejs)
-    const joystickZone = document.getElementById('joystick-zone');
-    if (joystickZone && typeof nipplejs !== 'undefined') {
-        const joystick = nipplejs.create({
-            zone: joystickZone,
-            mode: 'static',
-            position: { left: '70px', bottom: '70px' }, // 位置調整
-            color: 'rgba(0, 120, 255, 0.7)', // 色と透明度
-            size: 120 // サイズ調整
-        });
-        joystick.on('move', (evt, data) => {
-            if (data && data.vector && hp > 0) {
-                const angle = data.angle.radian;
-                const force = data.force;
-                // y: 前後進 (-1:後, 1:前) -> forceで強度調整
-                // x: 左右旋回 (-1:左, 1:右)
-                move.forward = Math.sin(angle) * force * 1.5; // 前後進の感度調整
-                move.turn = Math.cos(angle) * force * 1.5;    // 旋回の感度調整
-                move.forward = Math.max(-1, Math.min(1, move.forward));
-                move.turn = Math.max(-1, Math.min(1, move.turn));
-            }
-        });
-        joystick.on('end', () => {
-            move.forward = 0;
-            move.turn = 0;
-        });
-    } else if (!joystickZone) {
-        console.warn("要素 #joystick-zone が見つかりません。");
-    } else if (typeof nipplejs === 'undefined') {
-        console.warn("nipplejs がロードされていません。");
-    }
-
-
-    // ボタン入力 (タッチとマウス)
-    const setupButton = (id, downCallback, upCallback = null) => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        btn.addEventListener('touchstart', (e) => { if(hp > 0) downCallback(); e.preventDefault(); }, { passive: false });
-        if (upCallback) btn.addEventListener('touchend', upCallback);
-        btn.addEventListener('mousedown', () => { if(hp > 0) downCallback() });
-        if (upCallback) btn.addEventListener('mouseup', upCallback);
-        if (upCallback) btn.addEventListener('mouseleave', upCallback); // 範囲外でも離す
-        btn.addEventListener('contextmenu', (e) => e.preventDefault()); // 右クリックメニュー阻止
-    };
-
-    setupButton('missile-btn', () => { if(hp > 0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3())) });
-    setupButton('dash-btn', () => { if(hp > 0) startDash() });
-    setupButton('up-btn', () => { move.up = 1; }, () => { move.up = 0; });
-    setupButton('down-btn', () => { move.up = -1; }, () => { move.up = 0; });
-    // 例: 前進ボタン
-    // setupButton('forward-btn', () => move.forward = 1, () => move.forward = 0);
-}
-
-
-// --- 音声再生 ---
-function playSound(audioId, volume = 0.6, reset = true) {
-    const audio = document.getElementById(audioId);
-    if (audio instanceof HTMLAudioElement) { // HTMLAudioElementか確認
-        try {
-            if (reset) audio.currentTime = 0;
-            audio.volume = Math.max(0, Math.min(1, volume));
-            audio.play().catch(e => {
-                // 再生失敗時のログ（デバッグ用）
-                // console.warn(`Audio play failed for ${audioId}:`, e.name, e.message);
-            });
-        } catch (err) {
-            console.error(`Error playing sound ${audioId}:`, err);
-        }
-    }
-}
-
-function playShotSound() { playSound('shot-audio', 0.4); }
-function playDashSound() { playSound('dash-audio', 0.7); }
-function playBakuhaSound(volume = 0.7) { playSound('bakuha-audio', volume); }
-function playHitSound() { playSound('hit-audio', 0.6); }
-function playCoinSound() { playSound('coin-audio', 0.5); }
-
-function startBGM() {
-    const bgm = document.getElementById('bgm-audio');
-    if (bgm) {
-        bgm.loop = true;
-        bgm.volume = 0.3; // BGM音量調整
-        // ユーザー操作後に再生開始
-        const playBGM = () => {
-            bgm.play().then(() => {
-                 document.removeEventListener('click', playBGM);
-                 document.removeEventListener('touchstart', playBGM);
-            }).catch(()=>{}); // エラーは無視
-        };
-        document.addEventListener('click', playBGM);
-        document.addEventListener('touchstart', playBGM);
-    }
 }
 
 // --- ログイン画面 ---
