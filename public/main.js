@@ -1665,23 +1665,15 @@ async function setupRealtimeConnection() {
     // HP/スコア更新同期
     channel.subscribe('hp_update', (msg) => {
         const data = msg.data;
-        if (!data || !data.id) return;
-        if (data.id === myId) {
-            // 自分のHP/スコアがサーバーから来た場合 (通常は不要だが念のため)
-            // hp = data.hp;
-            // score = data.score;
-            // updateInfo();
-            // updateHeartDisplay(bird.userData.nameObj, hp);
-        } else if (peers[data.id]) {
-            const peer = peers[data.id];
-            peer.hp = data.hp;
-            peer.score = data.score;
-            peer.group.visible = peer.hp > 0; // HPに応じて表示設定
-            if (peer.nameObj) {
-                updateHeartDisplay(peer.nameObj, peer.hp);
-            }
-            updateRanking(); // スコアが変わった可能性があるのでランキング更新
+        if (!data || data.id === myId || !peers[data.id]) return;
+        const peer = peers[data.id];
+        peer.hp = data.hp;
+        peer.score = data.score;
+        peer.group.visible = peer.hp > 0; // HPに応じて表示設定
+        if (peer.nameObj) {
+            updateHeartDisplay(peer.nameObj, peer.hp);
         }
+        updateRanking(); // スコアが変わった可能性があるのでランキング更新
     });
 
     // リスポーン同期
@@ -2336,3 +2328,76 @@ window.addEventListener('beforeunload', () => {
     if (channel) channel.presence.leave(); // 必ず離脱
     if (ably) ably.close(); // Ably接続を閉じる
 });
+
+// 在室メンバー取得とUI更新
+async function updatePresenceInfo() {
+    try {
+        if (!channel) {
+            console.error('Ably channel is not initialized.');
+            userCount = 0;
+            updateInfo();
+            return;
+        }
+        if (!ably || ably.connection.state !== 'connected') {
+            console.warn('Ably is not connected yet.');
+            userCount = 0;
+            updateInfo();
+            return;
+        }
+        const members = await channel.presence.get();
+        console.log('Ably presence.get() result:', members, Array.isArray(members));
+        if (!Array.isArray(members)) {
+            console.error("Presence情報取得エラー: membersが配列ではありません", members);
+            userCount = 0;
+            updateInfo();
+            return;
+        }
+        userCount = members.length;
+        updateInfo(); // 接続人数表示更新
+
+        // 既存ピアの更新と新規ピアの追加
+        const currentPeerIds = new Set(Object.keys(peers));
+        for (const member of members) {
+            if (!member || typeof member !== 'object') continue;
+            if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
+
+            const state = member.data; // Presence data を使う
+            if (!state) continue; // データがない場合はスキップ
+
+            if (!peers[state.id]) { // 新規ピア
+                console.log(`新規ピア参加: ${state.name}(${state.id})`);
+                peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
+                scene.add(peers[state.id].group);
+            } else { // 既存ピアの情報更新
+                const peer = peers[state.id];
+                peer.group.position.set(state.x || 0, state.y || 10, state.z || 0); // 位置も同期？
+                peer.group.rotation.y = state.ry || 0; // 回転も同期？
+                setBirdColor(peer.group, state.color || '#ffffff');
+                peer.name = state.name || '???';
+                peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
+                peer.score = typeof state.score === 'number' ? state.score : 0;
+                if (peer.nameObj) {
+                    peer.nameObj.nameSpan.textContent = peer.name;
+                    updateHeartDisplay(peer.nameObj, peer.hp);
+                }
+                peer.group.visible = peer.hp > 0; // HPが0なら非表示
+            }
+            currentPeerIds.delete(state.id); // 処理済みピアIDをセットから削除
+        }
+
+        // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
+        // presenceにいなくなったがpeersに残っているピアを削除
+        for (const oldPeerId of currentPeerIds) {
+            if (peers[oldPeerId]) {
+                console.log(`ピア退出: ${peers[oldPeerId].name}(${oldPeerId})`);
+                removePeer(oldPeerId);
+            }
+        }
+        updateRanking(); // ランキング更新
+
+    } catch (err) {
+        console.error("Presence情報の取得/更新エラー:", err);
+        userCount = 0;
+        updateInfo();
+    }
+}
