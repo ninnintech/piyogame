@@ -2367,3 +2367,21 @@ function updateUIElements() {
 function renderScene() {
     renderer.render(scene, camera);
 }
+
+// スマホでの中断/再開処理
+document.addEventListener('visibilitychange', () => {
+    const bgm = document.getElementById('bgm-audio');
+    if (document.hidden) {
+        if (channel) channel.presence.leave();
+        if (ably && ably.connection.state === 'connected') {
+            // ably.connection.close();
+        }
+        if (bgm && !bgm.paused) bgm.pause();
+    } else {
+        if (ably && ably.connection.state !== 'connected') {
+            // 再接続処理
+        }
+        if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
+        if (bgm && bgm.paused) bgm.play().catch(()=>{});
+    }
+});
