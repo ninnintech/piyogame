@@ -1669,7 +1669,6 @@ function animate() {
       const dir = new THREE.Vector3(Math.sin(bird.rotation.y), 0, Math.cos(bird.rotation.y));
       bird.position.addScaledVector(dir, move.forward * speed);
       bird.position.y += move.up * 0.13;
-      bird.position.x = Math.max(-TERRAIN_SIZE/2+2, Math.min(TERRAIN_SIZE/2-2, bird.position.x));
       bird.position.y = Math.max(2, Math.min(80, bird.position.y));
       bird.position.z = Math.max(-TERRAIN_SIZE/2+2, Math.min(TERRAIN_SIZE/2-2, bird.position.z));
       // 衝突判定と多重補正（最大10回）
@@ -1684,110 +1683,112 @@ function animate() {
         bird.position.copy(safePos);
         fixCount++;
       }
-      // カメラ追従
-      camera.position.lerp(
-        new THREE.Vector3(
-          bird.position.x - 12 * Math.sin(bird.rotation.y),
-          bird.position.y + 6,
-          bird.position.z - 12 * Math.cos(bird.rotation.y)
-        ),
-        0.15
-      );
-      camera.lookAt(bird.position);
-      // 羽ばたきアニメーション
-      if (typeof leftWing !== 'undefined' && typeof rightWing !== 'undefined') {
-        wingAngle += 0.15 * wingDir;
-        if (wingAngle > 0.7 || wingAngle < -0.7) wingDir *= -1;
-        leftWing.rotation.x = wingAngle;
-        rightWing.rotation.x = -wingAngle;
-      }
+// カメラ追従
+camera.position.lerp(
+  new THREE.Vector3(
+    bird.position.x - 12 * Math.sin(bird.rotation.y),
+    bird.position.y + 6,
+    bird.position.z - 12 * Math.cos(bird.rotation.y)
+  ),
+  0.15
+);
+camera.lookAt(bird.position);
+
+// 羽ばたきアニメーション
+if (typeof leftWing !== 'undefined' && typeof rightWing !== 'undefined') {
+  wingAngle += 0.15 * wingDir;
+  if (wingAngle > 0.7 || wingAngle < -0.7) wingDir *= -1;
+  leftWing.rotation.x = wingAngle;
+  rightWing.rotation.x = -wingAngle;
+} // ← if文の閉じカッコはここだけ
+
+// ここからはif文の外！インデントを浅く
+// 車の移動
+if (typeof cars !== 'undefined') {
+  cars.forEach((car, i) => {
+    car.position.x += 0.45 * Math.cos(car.userData.dir);
+    car.position.z += 0.45 * Math.sin(car.userData.dir);
+    if (car.position.x > TERRAIN_SIZE/2) car.position.x = -TERRAIN_SIZE/2;
+    if (car.position.x < -TERRAIN_SIZE/2) car.position.x = TERRAIN_SIZE/2;
+    if (car.position.z > TERRAIN_SIZE/2) car.position.z = -TERRAIN_SIZE/2;
+    if (car.position.z < -TERRAIN_SIZE/2) car.position.z = TERRAIN_SIZE/2;
+  });
+}
+// 飛行機・ヘリコプターの移動
+if (typeof aircrafts !== 'undefined') {
+  for(const a of aircrafts){
+    if(a.userData.type==='airplane'){
+      const rad = 260 + 110*Math.sin(a.userData.phase);
+      const spd = 0.00018 + 0.00012*Math.cos(a.userData.phase);
+      a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
+      a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
+      a.position.y = a.userData.baseY + Math.sin(nowRaw*0.001 + a.userData.phase)*6;
+      a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
+    } else if(a.userData.type==='helicopter'){
+      const rad = 120 + 30*Math.sin(a.userData.phase);
+      const spd = 0.00023 + 0.00015*Math.cos(a.userData.phase);
+      a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
+      a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
+      a.position.y = a.userData.baseY + Math.sin(nowRaw*0.0017 + a.userData.phase)*5;
+      a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
+      a.children[2].rotation.y = nowRaw*0.04;
+      a.children[3].rotation.x = nowRaw*0.12;
     }
-    // 車の移動
-    if (typeof cars !== 'undefined') {
-      cars.forEach((car, i) => {
-        car.position.x += 0.45 * Math.cos(car.userData.dir);
-        car.position.z += 0.45 * Math.sin(car.userData.dir);
-        if (car.position.x > TERRAIN_SIZE/2) car.position.x = -TERRAIN_SIZE/2;
-        if (car.position.x < -TERRAIN_SIZE/2) car.position.x = TERRAIN_SIZE/2;
-        if (car.position.z > TERRAIN_SIZE/2) car.position.z = -TERRAIN_SIZE/2;
-        if (car.position.z < -TERRAIN_SIZE/2) car.position.z = TERRAIN_SIZE/2;
-      });
+  }
+}
+// NPC生成・移動
+if (typeof maintainNPCs === 'function') maintainNPCs();
+if (typeof npcs !== 'undefined') {
+  for (const n of npcs) {
+    n.position.addScaledVector(n.userData.dir, n.userData.speed);
+    if (n.position.x < -TERRAIN_SIZE/2 || n.position.x > TERRAIN_SIZE/2) n.userData.dir.x *= -1;
+    if (n.position.y < 3 || n.position.y > 35) n.userData.dir.y *= -1;
+    if (n.position.z < -TERRAIN_SIZE/2 || n.position.z > TERRAIN_SIZE/2) n.userData.dir.z *= -1;
+  }
+}
+// オンライン同期ミサイルの移動＆当たり判定
+if (typeof allMissiles !== 'undefined') {
+  for (const [mid, m] of Object.entries(allMissiles)) {
+    m.mesh.position.addScaledVector(m.dir, 1.5);
+    m.life++;
+    if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
+      channel && channel.publish('hit', { targetId: myId });
+      scene.remove(m.mesh);
+      delete allMissiles[mid];
+      handlePlayerHit(myId);
+      continue;
     }
-    // 飛行機・ヘリコプターの移動
-    if (typeof aircrafts !== 'undefined') {
-      for(const a of aircrafts){
-        if(a.userData.type==='airplane'){
-          const rad = 260 + 110*Math.sin(a.userData.phase);
-          const spd = 0.00018 + 0.00012*Math.cos(a.userData.phase);
-          a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
-          a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
-          a.position.y = a.userData.baseY + Math.sin(nowRaw*0.001 + a.userData.phase)*6;
-          a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
-        } else if(a.userData.type==='helicopter'){
-          const rad = 120 + 30*Math.sin(a.userData.phase);
-          const spd = 0.00023 + 0.00015*Math.cos(a.userData.phase);
-          a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
-          a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
-          a.position.y = a.userData.baseY + Math.sin(nowRaw*0.0017 + a.userData.phase)*5;
-          a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
-          a.children[2].rotation.y = nowRaw*0.04;
-          a.children[3].rotation.x = nowRaw*0.12;
-        }
-      }
-    }
-    // NPC生成・移動
-    if (typeof maintainNPCs === 'function') maintainNPCs();
-    if (typeof npcs !== 'undefined') {
-      for (const n of npcs) {
-        n.position.addScaledVector(n.userData.dir, n.userData.speed);
-        if (n.position.x < -TERRAIN_SIZE/2 || n.position.x > TERRAIN_SIZE/2) n.userData.dir.x *= -1;
-        if (n.position.y < 3 || n.position.y > 35) n.userData.dir.y *= -1;
-        if (n.position.z < -TERRAIN_SIZE/2 || n.position.z > TERRAIN_SIZE/2) n.userData.dir.z *= -1;
-      }
-    }
-    // オンライン同期ミサイルの移動＆当たり判定
-    if (typeof allMissiles !== 'undefined') {
-      for (const [mid, m] of Object.entries(allMissiles)) {
-        m.mesh.position.addScaledVector(m.dir, 1.5);
-        m.life++;
-        if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
-          channel && channel.publish('hit', { targetId: myId });
+    if (m.ownerId === myId) {
+      for (const pid in peers) {
+        const peer = peers[pid];
+        if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
+          channel && channel.publish('hit', { targetId: pid });
           scene.remove(m.mesh);
           delete allMissiles[mid];
-          handlePlayerHit(myId);
-          continue;
-        }
-        if (m.ownerId === myId) {
-          for (const pid in peers) {
-            const peer = peers[pid];
-            if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
-              channel && channel.publish('hit', { targetId: pid });
-              scene.remove(m.mesh);
-              delete allMissiles[mid];
-              break;
-            }
-          }
-        }
-        if (m.life > 60) {
-          scene.remove(m.mesh);
-          delete allMissiles[mid];
+          break;
         }
       }
     }
-    // ローカルミサイルの移動
-    if (typeof updateLocalMissiles === 'function') updateLocalMissiles();
-    if (typeof checkAllChickenHits === 'function') checkAllChickenHits();
-    // 鶏の移動
-    if (typeof chickens !== 'undefined') {
-      for (const chicken of chickens) {
-        if (typeof moveChickenSlowly === 'function') moveChickenSlowly(chicken);
-      }
+    if (m.life > 60) {
+      scene.remove(m.mesh);
+      delete allMissiles[mid];
     }
-    if (typeof updateMyNameObjPosition === 'function') updateMyNameObjPosition();
-    if (typeof updateNameObjPosition === 'function') Object.values(peers).forEach(updateNameObjPosition);
-    if (typeof checkCoinCollision === 'function') checkCoinCollision();
-    if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
-    renderer.render(scene, camera);
+  }
+}
+// ローカルミサイルの移動
+if (typeof updateLocalMissiles === 'function') updateLocalMissiles();
+if (typeof checkAllChickenHits === 'function') checkAllChickenHits();
+// 鶏の移動
+if (typeof chickens !== 'undefined') {
+  for (const chicken of chickens) {
+    if (typeof moveChickenSlowly === 'function') moveChickenSlowly(chicken);
+  }
+}
+if (typeof updateMyNameObjPosition === 'function') updateMyNameObjPosition();
+if (typeof updateNameObjPosition === 'function') Object.values(peers).forEach(updateNameObjPosition);
+if (typeof checkCoinCollision === 'function') checkCoinCollision();
+if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
+renderer.render(scene, camera);
   } catch (e) {
     if (!animate.lastError || animate.lastError !== String(e)) {
       animate.lastError = String(e);
