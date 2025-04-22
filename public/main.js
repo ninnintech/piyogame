@@ -1931,11 +1931,10 @@ startGame = function() {
 };
 
 // --- 毎フレーム：大ハートの当たり判定 ---
-const origAnimate = animate;
-animate = function() {
+function animate() {
   checkBigHeartCollision();
-  if (typeof origAnimate === 'function') origAnimate();
-};
+  // ... (animate関数の残りの部分)
+}
 
 // --- ピア（他プレイヤー）のHPラベルは常に表示（HP0でも消さない） ---
 function updateNameObjPosition(peer) {
