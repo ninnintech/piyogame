@@ -1575,9 +1575,9 @@ function escapeHTML(str) {
 async function initAbly() {
     try {
         const apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : '';
-        const authUrl = `${apiBase}/api/token`;
-        // authUrl方式で初期化（SDKが自動でトークン取得）
-        return new Ably.Realtime({ authUrl, clientId: 'user-' + Math.random().toString(36).substring(2, 9) });
+        const myClientId = 'player_' + Math.random().toString(36).slice(2, 11);
+        const authUrl = `${apiBase}/api/token?clientId=${encodeURIComponent(myClientId)}`;
+        return new Ably.Realtime({ authUrl, clientId: myClientId });
     } catch (error) {
         console.error('Ably初期化エラー:', error);
         alert('サーバー接続エラー: 認証トークンの取得に失敗しました。\nサーバーが動作していて、URLが正しいか確認してください。');
@@ -1590,7 +1590,7 @@ async function setupRealtimeConnection() {
     ably = await initAbly();
     if (!ably) return; // 初期化失敗
 
-    channel = ably.channels.get('bird-garden-3d-v2'); // チャンネル名変更推奨
+    channel = ably.channels.get('bird-garden-3d-v2');
 
     // チャンネルのアタッチ完了を待つ
     await new Promise((resolve, reject) => {
@@ -1598,6 +1598,9 @@ async function setupRealtimeConnection() {
         channel.once('failed', reject);
         channel.attach();
     });
+
+    // Ablyが決定したclientIdでmyIdを上書き
+    myId = ably.auth.clientId;
 
     // --- Presence (入退室管理) ---
     await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
@@ -1849,7 +1852,7 @@ function sendState() {
 // --- ゲームロジック ---
 
 function startGame() {
-    myId = `player_${Math.random().toString(36).slice(2, 11)}`; // よりユニークなID
+    myId = ably.auth.clientId;
     console.log(`My ID: ${myId}, Name: ${myName}, Color: ${myColor}`);
 
     initGraphics();
