@@ -623,7 +623,23 @@ function scheduleRainbowChickenRespawn() {
   }, 5 * 60 * 1000); // 5分後
 }
 
-
+// --- 鶏の移動関数 ---
+function moveChickenSlowly(chicken) {
+  // ゆっくり・ふわふわ飛び回る動き
+  if (!chicken.userData.basePos) {
+    chicken.userData.basePos = chicken.position.clone();
+    chicken.userData.phase = Math.random() * Math.PI * 2;
+    chicken.userData.radius = 55 + Math.random() * 60;
+    // 通常の鶏はさらに遅く
+    chicken.userData.speed = chicken.userData.isGold ? 0.00013 + Math.random() * 0.00007 : 0.00015 + Math.random() * 0.00009;
+    chicken.userData.height = 38 + Math.random() * 20;
+  }
+  const now = performance.now();
+  chicken.position.x = chicken.userData.basePos.x + Math.cos(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.z = chicken.userData.basePos.z + Math.sin(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.y = chicken.userData.height + Math.sin(now * 0.0008 + chicken.userData.phase) * 7;
+  chicken.rotation.y = Math.PI/2 - (now * chicken.userData.speed + chicken.userData.phase);
+}
 
 // --- 飛行機・ヘリコプター生成 ---
 const aircrafts = [];
@@ -1752,7 +1768,22 @@ function checkChickenHitByMissile(missile) {
   }
 }
 
-
+// --- プレイヤーがミサイルでヒットしたか判定し、必要に応じて処理を行う ---
+function checkPlayerHitByMissile() {
+  // ローカルミサイルが自分自身に当たったか判定（多重処理防止のためhp>0のみ）
+  if (typeof hp !== 'number' || hp <= 0) return;
+  for (let i = missiles.length - 1; i >= 0; i--) {
+    const m = missiles[i];
+    if (m.mesh.position.distanceTo(bird.position) < 2.4) {
+      // サーバーにヒット通知
+      if (channel) channel.publish('player_hit', { targetId: myId, attackerId: m.ownerId || myId });
+      scene.remove(m.mesh);
+      missiles.splice(i, 1);
+      // handlePlayerHit(myId); // 旧ローカル処理は不要
+      break;
+    }
+  }
+}
 
 // --- ヒット音再生 ---
 function playHitSound() {
