@@ -22,7 +22,7 @@ let rainbowChickenTimeout = null;
 let coins = [];
 let cars = [];
 let aircrafts = [];
-let npcs = []; // その他のNPC (未使用？)
+let npcs = []; // その他のNPC（現状未使用）
 let bigHearts = []; // 回復ハート
 
 let move = { forward: 0, turn: 0, up: 0 };
@@ -759,16 +759,12 @@ function updateAllNameObjPositions() {
     // 自分のラベル更新
     if (bird && bird.userData.nameObj) {
         updateNameObjPosition(bird.userData.nameObj);
-        // 自分のHPも更新
-        updateHeartDisplay(bird.userData.nameObj, hp);
     }
     // 他プレイヤーのラベル更新
     for (const peerId in peers) {
         const peer = peers[peerId];
         if (peer && peer.nameObj) {
             updateNameObjPosition(peer.nameObj);
-            // ピアのHPも更新
-            updateHeartDisplay(peer.nameObj, peer.hp);
         }
     }
 }
@@ -2168,49 +2164,3 @@ async function startGame() {
     }
 }
 window.startGame = startGame;
-
-window.addEventListener('DOMContentLoaded', () => {
-    try {
-        initGraphics();
-        showLogin();
-        // 必要に応じて他の初期化（例：BGM再生の準備など）
-    } catch (e) {
-        console.error("ログイン画面の初期化エラー:", e);
-    }
-});
-
-window.addEventListener('resize', () => {
-    if (camera && renderer) {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-});
-
-// スマホでの中断/再開処理
-document.addEventListener('visibilitychange', () => {
-    const bgm = document.getElementById('bgm-audio');
-    if (document.hidden) {
-        // バックグラウンドになった時
-        if (channel) channel.presence.leave(); // 一時離脱
-        if (ably && ably.connection.state === 'connected') {
-             // ably.connection.close(); // 完全切断せず、離脱だけが良いかも
-        }
-        if (bgm && !bgm.paused) bgm.pause();
-    } else {
-        // フォアグラウンドに戻った時
-        if (ably && ably.connection.state !== 'connected') {
-             // 再接続処理が必要な場合
-             // setupRealtimeConnection(); // 再初期化 or
-             // ably.connection.connect();
-        }
-         if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp }); // 再入室
-        if (bgm && bgm.paused) bgm.play().catch(()=>{}); // BGM再開
-    }
-});
-
-// ページを閉じる/移動する前の処理
-window.addEventListener('beforeunload', () => {
-    if (channel) channel.presence.leave(); // 必ず離脱
-    if (ably) ably.close(); // Ably接続を閉じる
-});
