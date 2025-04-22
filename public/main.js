@@ -1991,20 +1991,28 @@ function setupInput() {
         const upBtn = document.getElementById('up-btn');
         const downBtn = document.getElementById('down-btn');
         if (upBtn) {
-            upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn touchstart', move); });
-            upBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn touchend', move); });
-            upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn mousedown', move); });
-            upBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseup', move); });
-            upBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseleave', move); });
+            upBtn.replaceWith(upBtn.cloneNode(true));
+        }
+        if (downBtn) {
+            downBtn.replaceWith(downBtn.cloneNode(true));
+        }
+        const freshUpBtn = document.getElementById('up-btn');
+        const freshDownBtn = document.getElementById('down-btn');
+        if (freshUpBtn) {
+            freshUpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn touchstart', move); });
+            freshUpBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn touchend', move); });
+            freshUpBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn mousedown', move); });
+            freshUpBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseup', move); });
+            freshUpBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseleave', move); });
         } else {
             console.warn('up-btn not found');
         }
-        if (downBtn) {
-            downBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn touchstart', move); });
-            downBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn touchend', move); });
-            downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn mousedown', move); });
-            downBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseup', move); });
-            downBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseleave', move); });
+        if (freshDownBtn) {
+            freshDownBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn touchstart', move); });
+            freshDownBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn touchend', move); });
+            freshDownBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn mousedown', move); });
+            freshDownBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseup', move); });
+            freshDownBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseleave', move); });
         } else {
             console.warn('down-btn not found');
         }
@@ -2434,3 +2442,5 @@ window.addEventListener('beforeunload', () => {
     if (channel) channel.presence.leave(); // 必ず離脱
     if (ably) ably.close(); // Ably接続を閉じる
 });
+
+```
