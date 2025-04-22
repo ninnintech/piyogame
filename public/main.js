@@ -2090,6 +2090,9 @@ function showLogin() {
 
     loginModal.style.display = 'flex';
 
+    loginBtn.replaceWith(loginBtn.cloneNode(true));
+    const freshLoginBtn = document.getElementById('login-btn');
+
     loginBtn.onclick = () => {
         const name = nameInput.value.trim();
         const color = colorInput.value;
