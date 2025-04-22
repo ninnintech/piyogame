@@ -2006,7 +2006,7 @@ function removeDashEffect() {
         leftWing.rotation.x = wingAngle;
         rightWing.rotation.x = -wingAngle;
       }
-    }
+    
     // 車の移動
     if (typeof cars !== 'undefined') {
       cars.forEach((car, i) => {
