@@ -1841,7 +1841,7 @@ window.addEventListener('DOMContentLoaded', () => {
     try {
         initGraphics();
         showLogin();
-        // 必要に応じて他の初期化（例: BGM再生の準備など）
+        // 必要に応じて他の初期化（例：BGM再生の準備など）
     } catch (e) {
         console.error("ログイン画面の初期化エラー:", e);
     }
@@ -2144,7 +2144,7 @@ function renderScene() {
     renderer.render(scene, camera)
 }
 
-function startGame() {
+async function startGame() {
     // ログイン画面を非表示
     const loginModal = document.getElementById('login-modal');
     if (loginModal) loginModal.style.display = 'none';
@@ -2156,7 +2156,7 @@ function startGame() {
     // 必要な初期化処理（例：Ably接続、BGM再生など）
     if (!ably) {
         myId = myId || `Guest_${Math.random().toString(36).slice(2, 7)}`;
-        ably = initAbly(myId);
+        ably = await initAbly(myId); // Promiseならawait
     }
     if (ably && typeof setupRealtimeConnection === 'function') {
         setupRealtimeConnection();
