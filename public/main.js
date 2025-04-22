@@ -1578,6 +1578,10 @@ async function initAbly() {
         const response = await fetch(`${apiBase}/api/token`);
         if (!response.ok) throw new Error(`トークン取得エラー: ${response.status}`);
         const tokenRequest = await response.json();
+        console.log('[DEBUG] Ably tokenRequest:', tokenRequest);
+        if (!tokenRequest || (!tokenRequest.token && !tokenRequest.key && !tokenRequest.id)) {
+            throw new Error('Ablyトークンレスポンスが不正です: ' + JSON.stringify(tokenRequest));
+        }
         return new Ably.Realtime({ authCallback: (_, callback) => callback(null, tokenRequest) });
     } catch (error) {
         console.error('Ably初期化エラー:', error);
@@ -1623,33 +1627,25 @@ async function setupRealtimeConnection() {
                     continue;
                 }
 
-                const state = member.data; // Presence data を使う
-                if (!state || typeof state !== 'object') continue; // データがない/不正ならスキップ
-
-                if (!('id' in state)) {
-                    console.warn("Presence stateにidがありません", state);
-                    continue;
-                }
-
-                if (!peers[state.id]) { // 新規ピア
-                    console.log(`新規ピア参加: ${state.name}(${state.id})`);
-                    peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
-                    scene.add(peers[state.id].group);
+                if (!peers[member.data.id]) { // 新規ピア
+                    console.log(`新規ピア参加: ${member.data.name}(${member.data.id})`);
+                    peers[member.data.id] = createPeerBird(member.data); // createPeerBirdはstateを引数に取る
+                    scene.add(peers[member.data.id].group);
                 } else { // 既存ピアの情報更新
-                    const peer = peers[state.id];
-                    peer.group.position.set(state.x || 0, state.y || 10, state.z || 0); // 位置も同期？
-                    peer.group.rotation.y = state.ry || 0; // 回転も同期？
-                    setBirdColor(peer.group, state.color || '#ffffff');
-                    peer.name = state.name || '???';
-                    peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
-                    peer.score = typeof state.score === 'number' ? state.score : 0;
+                    const peer = peers[member.data.id];
+                    peer.group.position.set(member.data.x || 0, member.data.y || 10, member.data.z || 0); // 位置も同期？
+                    peer.group.rotation.y = member.data.ry || 0; // 回転も同期？
+                    setBirdColor(peer.group, member.data.color || '#ffffff');
+                    peer.name = member.data.name || '???';
+                    peer.hp = typeof member.data.hp === 'number' ? member.data.hp : MAX_HP;
+                    peer.score = typeof member.data.score === 'number' ? member.data.score : 0;
                     if (peer.nameObj) {
                         peer.nameObj.nameSpan.textContent = peer.name;
                         updateHeartDisplay(peer.nameObj, peer.hp);
                     }
                     peer.group.visible = peer.hp > 0; // HPが0なら非表示
                 }
-                currentPeerIds.delete(state.id); // 処理済みピアIDをセットから削除
+                currentPeerIds.delete(member.data.id); // 処理済みピアIDをセットから削除
             }
 
             // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
