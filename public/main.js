@@ -443,7 +443,9 @@ function checkAllChickenHits() {
   for (const missileId in allMissiles) {
     const missile = allMissiles[missileId];
     if (!missile || !missile.mesh || missile.life <= 0) continue;
-    for (const chicken of chickens) {
+    // 通常鶏
+    for (let i = chickens.length - 1; i >= 0; i--) {
+      const chicken = chickens[i];
       const distance = missile.mesh.position.distanceTo(chicken.position);
       console.log(`Missile ${missileId} at ${missile.mesh.position.toArray()} | Chicken at ${chicken.position.toArray()} | Distance: ${distance}`);
       if (distance < 5.0) {
@@ -458,6 +460,30 @@ function checkAllChickenHits() {
         scene.remove(missile.mesh);
         missile.life = 0;
         delete allMissiles[missileId]; // 完全削除
+        break;
+      }
+    }
+    // 虹色チキン
+    if (rainbowChicken) {
+      const distance = missile.mesh.position.distanceTo(rainbowChicken.position);
+      if (distance < 7.0) {
+        rainbowChicken.userData.hp--;
+        rainbowChicken.userData.lastHitPlayer = myId; // 最後に当てたプレイヤー
+        spawnChickenEffect(rainbowChicken.position, false);
+        playBakuhaSound();
+        scene.remove(missile.mesh);
+        missile.life = 0;
+        delete allMissiles[missileId];
+        if (rainbowChicken.userData.hp <= 0) {
+          // 5ポイント加算
+          if (rainbowChicken.userData.lastHitPlayer === myId) {
+            score += 5;
+            updateInfo();
+          }
+          // 消滅＆5分後に再出現
+          removeRainbowChicken();
+          scheduleRainbowChickenRespawn();
+        }
         break;
       }
     }
@@ -573,80 +599,6 @@ function moveChickenSlowly(chicken) {
   chicken.rotation.y = Math.PI/2 - (now * chicken.userData.speed + chicken.userData.phase);
 }
 
-// --- 鶏の当たり判定修正 ---
-function checkAllChickenHits() {
-  for (const missileId in allMissiles) {
-    const missile = allMissiles[missileId];
-    if (!missile || !missile.mesh || missile.life <= 0) continue;
-    // 通常鶏
-    for (let i = chickens.length - 1; i >= 0; i--) {
-      const chicken = chickens[i];
-      const distance = missile.mesh.position.distanceTo(chicken.position);
-      if (distance < 5.0) {
-        score += chicken.userData.isGold ? 2 : 1;
-        updateInfo();
-        spawnChickenEffect(chicken.position, chicken.userData.isGold);
-        playBakuhaSound();
-        scene.remove(chicken);
-        chickens.splice(i, 1);
-        // 再出現
-        setTimeout(() => {
-          const newChicken = createChicken(chicken.userData.isGold);
-          newChicken.position.copy(randomChickenPosition());
-          chickens.push(newChicken);
-          scene.add(newChicken);
-          addCollisionObject(newChicken, 4);
-        }, 800);
-        // ミサイル消去
-        scene.remove(missile.mesh);
-        missile.life = 0;
-        delete allMissiles[missileId];
-        break;
-      }
-    }
-    // 虹色チキン
-    if (rainbowChicken) {
-      const distance = missile.mesh.position.distanceTo(rainbowChicken.position);
-      if (distance < 7.0) {
-        rainbowChicken.userData.hp--;
-        rainbowChicken.userData.lastHitPlayer = myId; // 最後に当てたプレイヤー
-        spawnChickenEffect(rainbowChicken.position, false);
-        playBakuhaSound();
-        scene.remove(missile.mesh);
-        missile.life = 0;
-        delete allMissiles[missileId];
-        if (rainbowChicken.userData.hp <= 0) {
-          // 5ポイント加算
-          if (rainbowChicken.userData.lastHitPlayer === myId) {
-            score += 5;
-            updateInfo();
-          }
-          // 消滅＆5分後に再出現
-          removeRainbowChicken();
-          scheduleRainbowChickenRespawn();
-        }
-        break;
-      }
-    }
-  }
-}
-
-// --- ゲーム開始時に虹色チキンをまれに出現 ---
-function spawnGameObjects() {
-  for (const c of coins) scene.remove(c);
-  coins.length = 0;
-  for (const c of chickens) scene.remove(c);
-  chickens.length = 0;
-  spawnCoinsAtSky(16);
-  spawnChickens();
-  // まれに虹色チキン
-  if (Math.random() < 0.07) {
-    spawnRainbowChicken();
-  } else {
-    scheduleRainbowChickenRespawn();
-  }
-}
-
 // --- 飛行機・ヘリコプター生成 ---
 const aircrafts = [];
 function createAirplane() {
@@ -672,7 +624,8 @@ function createAirplane() {
   tail.position.set(-3.2, 0.4, 0);
   tail.rotation.z = Math.PI/10;
   plane.add(tail);
-  // 位置・回転
+
+  // 位置・回転の初期化
   plane.position.set((Math.random()-0.5)*TERRAIN_SIZE*0.7, 60+Math.random()*30, (Math.random()-0.5)*TERRAIN_SIZE*0.7);
   plane.userData = { type: 'airplane', baseY: plane.position.y, phase: Math.random()*Math.PI*2 };
   scene.add(plane);
