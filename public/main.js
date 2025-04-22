@@ -2117,3 +2117,42 @@ function removeDashEffect() {
     requestAnimationFrame(animate);
   }
 }
+
+animate();
+
+// --- サブスクライブ: 他プレイヤーの状態反映 ---
+// channel.subscribe('state', (msg) => {
+//   const s = msg.data;
+//   if (s.id === myId) return; // 自分は除外
+//   if (!peers[s.id]) {
+//     peers[s.id] = createPeerBird(s);
+//     scene.add(peers[s.id].group);
+//   }
+//   const peer = peers[s.id];
+//   peer.group.position.set(s.x, s.y, s.z);
+//   peer.group.rotation.y = s.ry;
+//   setBirdColor(peer.group, s.color);
+//   peer.nameObj.element.textContent = s.name;
+//   updateNameObjPosition(peer);
+//   // HP/スコア
+//   if (typeof msg.hp === 'number') peer.hp = msg.hp;
+//   if (typeof msg.score === 'number') peer.score = msg.score;
+// });
+
+// --- ミサイル発射 ---
+function fireMissile() {
+  if (!channel) return; // チャンネルが初期化されていなければ処理しない
+  
+  playShotSound();
+  const dir = new THREE.Vector3(Math.sin(bird.rotation.y), 0, Math.cos(bird.rotation.y));
+  launchLocalMissile(bird.position, dir);
+  channel.publish('fire', {
+    id: myId,
+    x: bird.position.x,
+    y: bird.position.y,
+    z: bird.position.z,
+    dx: dir.x,
+    dy: dir.y,
+    dz: dir.z
+  });
+}
