@@ -948,16 +948,16 @@ function updateHeartDisplay(birdOrPeer, hpVal) {
 }
 
 // --- 名前ラベル位置同期時にHPも反映 ---
-function updateNameObjPosition(peer) {
-  var pos = peer.group.position.clone();
-  pos.y += 2.2;
-  pos.project(camera);
-  var x = (pos.x * 0.5 + 0.5) * window.innerWidth;
-  var y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
-  peer.nameObj.element.style.left = (x - 32) + "px";
-  peer.nameObj.element.style.top = (y - 18) + "px";
-  updateHeartDisplay(peer, peer.hp);
-}
+// function updateNameObjPosition(peer) {
+//   var pos = peer.group.position.clone();
+//   pos.y += 2.2;
+//   pos.project(camera);
+//   var x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+//   var y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+//   peer.nameObj.element.style.left = (x - 32) + "px";
+//   peer.nameObj.element.style.top = (y - 18) + "px";
+//   updateHeartDisplay(peer, peer.hp);
+// }
 function updateMyNameObjPosition() {
   if (!bird.userData.nameObj) return;
   var pos = bird.position.clone();
