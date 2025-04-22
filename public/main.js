@@ -717,7 +717,7 @@ function updateHeartDisplay(nameObj, hpVal) {
     let hearts = '';
     const currentHp = Math.max(0, Math.min(MAX_HP, hpVal)); // HPを範囲内に収める
     for (let i = 0; i < MAX_HP; i++) {
-        hearts += i < currentHp ? '♥' : '♡';
+        hearts += i < currentHp ? '&#x2764;' : '&#x2661;';
     }
     // スタイルを直接指定する代わりにクラスで管理も可能
     nameObj.heartDiv.innerHTML = `<span style='color:#ff6b6b; text-shadow: 0 0 3px #ffffff;'>${hearts}</span>`;
@@ -1561,11 +1561,11 @@ function escapeHTML(str) {
     if (!str) return '';
     return str.replace(/[&<>"']/g, function(match) {
         return {
-            '&': '&',
-            '<': '<',
-            '>': '>',
-            '"': '"',
-            "'": '''
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
         }[match];
     });
 }
@@ -1720,7 +1720,7 @@ async function setupRealtimeConnection() {
             const peer = peers[data.id];
             peer.hp = data.hp;
             peer.score = data.score;
-            peer.group.visible = peer.hp > 0; // HPに応じて表示/非表示
+            peer.group.visible = peer.hp > 0; // HPに応じて表示設定
             if (peer.nameObj) {
                 updateHeartDisplay(peer.nameObj, peer.hp);
             }
@@ -2074,34 +2074,80 @@ window.addEventListener('beforeunload', () => {
 
 // --- アニメーションループ ---
 let lastTimestamp = 0;
+let errorDisplayTimeout = null; // エラー表示タイマー
 
 function animate(timestamp) {
     requestAnimationFrame(animate); // 次のフレームを予約
 
     const deltaTime = (timestamp - lastTimestamp) * 0.001; // 秒単位のデルタタイム
+    // deltaTimeが異常に大きい場合(タブが非アクティブだったなど)は補正
+    const dt = Math.min(deltaTime, 0.1); // 最大0.1秒とする
     lastTimestamp = timestamp;
 
     // --- 更新処理 ---
     try {
         if (bird && bird.visible) { // プレイヤーが存在し表示されている場合のみ更新
-            updatePlayerMovement(deltaTime);
-            updateCameraAndWing(deltaTime);
+            updatePlayerMovement(dt); // deltaTime -> dt
+            updateCameraAndWing(dt); // deltaTime -> dt
             updateDash(); // ダッシュゲージとエフェクト、当たり判定
         }
-        updateVehicles(deltaTime);
-        updateAircrafts(deltaTime);
+        updateVehicles(dt); // deltaTime -> dt
+        updateAircrafts(dt); // deltaTime -> dt
         updateProjectiles(); // ミサイルの更新（当たり判定含む）
-        updateChickensAndHearts(deltaTime); // 鶏とハートの更新
+        updateChickensAndHearts(dt); // 鶏とハートの更新 (deltaTime -> dt)
         updateUIElements(); // UI全般の更新
 
         renderScene(); // 描画
+
+        // エラー表示があれば徐々に消す
+        const errDiv = document.getElementById('error-log');
+        if (errDiv && errDiv.style.opacity > 0) {
+            errDiv.style.opacity = Math.max(0, errDiv.style.opacity - 0.005); // ゆっくり消える
+            if (errDiv.style.opacity == 0) {
+                 errDiv.style.display = 'none'; // 完全に消えたら非表示に
+            }
+        }
+
     } catch (e) {
         console.error("[animate] エラー発生:", e);
         // エラーログ表示 (より詳細に)
         let errDiv = document.getElementById('error-log');
-        if (!errDiv) { /* ... エラー表示要素作成 ... */ }
-        errDiv.textContent = `[animate] Error: ${e.message}\n${e.stack}`;
-        // 場合によってはゲームループを停止する？ (requestAnimationFrameを呼ばない)
+        if (!errDiv) {
+            // === ここから修正・追加 ===
+            errDiv = document.createElement('div');
+            errDiv.id = 'error-log';
+            errDiv.style.position = 'fixed';
+            errDiv.style.bottom = '10px';
+            errDiv.style.left = '10px';
+            errDiv.style.background = 'rgba(220, 0, 0, 0.9)'; // 少し濃い赤
+            errDiv.style.color = '#fff';
+            errDiv.style.padding = '10px 15px';
+            errDiv.style.zIndex = '10000'; // 最前面に
+            errDiv.style.fontSize = '13px'; // 少し小さく
+            errDiv.style.borderRadius = '5px';
+            errDiv.style.maxWidth = 'calc(100% - 20px)';
+            errDiv.style.maxHeight = '40vh'; // 高さ制限
+            errDiv.style.overflowY = 'auto'; // スクロール可能に
+            errDiv.style.whiteSpace = 'pre-wrap';
+            errDiv.style.wordBreak = 'break-all';
+            errDiv.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+            errDiv.style.transition = 'opacity 0.5s ease-out'; // フェードアウト用
+            document.body.appendChild(errDiv);
+            // === ここまで修正・追加 ===
+        }
+        // エラーメッセージ表示、表示を更新
+        errDiv.textContent = `[Animate Loop Error]\n${e.message}\n\nStack:\n${e.stack}`;
+        errDiv.style.display = 'block'; // 表示する
+        errDiv.style.opacity = '1'; // 不透明にする
+
+        // エラー表示を一定時間後に自動で薄くし始めるタイマー（既にあればクリア）
+        if (errorDisplayTimeout) clearTimeout(errorDisplayTimeout);
+        errorDisplayTimeout = setTimeout(() => {
+           // opacityを下げる処理はanimateループ内で既に行っているので、ここでは何もしない
+        }, 10000); // 10秒後にフェードアウト開始
+
+        // エラー発生時はこのフレームの処理を中断 (場合による)
+        // return;
     }
 }
 
