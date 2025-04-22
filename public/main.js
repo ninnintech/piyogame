@@ -9,9 +9,6 @@ let chickens = [];
 // --- 衝突判定用のオブジェクトを格納する配列
 const collisionObjects = [];
 
-// --- ピア（他プレイヤー）管理 ---
-let peers = {};
-
 // --- 衝突判定用のオブジェクトを追加 ---
 function addCollisionObject(object, radius) {
   // 衝突判定用のオブジェクト情報をcollisionObjects配列に追加
@@ -1376,7 +1373,7 @@ let rankingDiv;
 window.addEventListener('DOMContentLoaded', () => {
   rankingDiv = document.createElement('div');
   rankingDiv.style.position = 'fixed';
-  rankingDiv.style.top = '100px';
+  rankingDiv.style.top = '10px';
   rankingDiv.style.right = '10px';
   rankingDiv.style.background = 'rgba(255,255,255,0.85)';
   rankingDiv.style.color = '#333';
@@ -1915,13 +1912,3 @@ window.addEventListener('beforeunload', () => {
   const bgmAudio = document.getElementById('bgm-audio');
   if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
 });
-
-// --- ヒット効果音再生 ---
-function playHitSound() {
-  const hitAudio = document.getElementById('hit-audio');
-  if (hitAudio) {
-    hitAudio.currentTime = 0;
-    hitAudio.volume = 0.7;
-    hitAudio.play().catch(()=>{});
-  }
-}
