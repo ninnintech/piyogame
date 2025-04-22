@@ -1583,14 +1583,17 @@ function updateLocalMissiles() {
 // --- HP/スコア同期時にもハート更新 ---
 if (channel) {
   channel.subscribe('hp_score', (msg) => {
+    console.log('[hp_score debug]', msg, 'myId:', myId); // デバッグ出力追加
     if (msg.data.id === myId) {
       hp = msg.data.hp;
       score = msg.data.score;
+      console.log('[hp_score debug] self update', score, hp); // デバッグ出力追加
       updateInfo();
       updateHeartDisplay(bird, hp);
     } else if (peers[msg.data.id]) {
       peers[msg.data.id].hp = msg.data.hp;
       peers[msg.data.id].score = msg.data.score;
+      console.log('[hp_score debug] peer update', msg.data.id, peers[msg.data.id].score, peers[msg.data.id].hp); // デバッグ出力追加
       updateHeartDisplay(peers[msg.data.id], peers[msg.data.id].hp);
     }
   });
@@ -1668,7 +1671,7 @@ for (const [mid, m] of Object.entries(allMissiles)) {
     for (const pid in peers) {
       const peer = peers[pid];
       if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 2.4) {
-        // channel.publish('hit', { targetId: pid });
+        channel.publish('hit', { targetId: pid });
         scene.remove(m.mesh);
         delete allMissiles[mid];
         break;
@@ -1960,33 +1963,7 @@ function animate() {
       if (n.position.y < 3 || n.position.y > 35) n.userData.dir.y *= -1;
       if (n.position.z < -TERRAIN_SIZE/2 || n.position.z > TERRAIN_SIZE/2) n.userData.dir.z *= -1;
     }
-    // オンライン同期ミサイルの移動
-    for (const [mid, m] of Object.entries(allMissiles)) {
-      m.mesh.position.addScaledVector(m.dir, 1.5);
-      m.life++;
-      if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 2.4 && hp > 0) {
-        // channel.publish('hit', { targetId: myId });
-        scene.remove(m.mesh);
-        delete allMissiles[mid];
-        handlePlayerHit(myId); // 自分が撃墜された時の処理を呼び出す
-        continue;
-      }
-      if (m.ownerId === myId) {
-        for (const pid in peers) {
-          const peer = peers[pid];
-          if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 2.4) {
-            // channel.publish('hit', { targetId: pid });
-            scene.remove(m.mesh);
-            delete allMissiles[mid];
-            break;
-          }
-        }
-      }
-      if (m.life > 60) {
-        scene.remove(m.mesh);
-        delete allMissiles[mid];
-      }
-    }
+
     // ローカルミサイルの移動
     updateLocalMissiles();
     checkAllChickenHits();
@@ -2051,7 +2028,7 @@ function spawnCoinsAtSky(count = 16) {
       }
       if (!tooClose) {
         const geometry = new THREE.TorusGeometry(2.0, 0.7, 32, 64);
-        geometry.scale(1, 1.8, 1);
+        geometry.scale(1, 1.8, 1); // 縦長に
         const material = new THREE.MeshBasicMaterial({
           color: 0xFFFF99,
           transparent: true,
