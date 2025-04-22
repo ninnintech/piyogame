@@ -494,7 +494,8 @@ function checkAllChickenHits() {
         scene.remove(chicken); // 鶏を一度消す
         chickens.splice(i, 1); // 配列からも削除
         setTimeout(() => {
-          respawnChicken(chicken); // ランダム位置に再配置
+          // ランダムなマップ上の位置で復活
+          respawnChicken(chicken); // 位置をランダムに再設定
           chickens.push(chicken); // 配列に再追加
           scene.add(chicken); // 再度フィールドに追加
         }, 1200); // エフェクト後に再出現
@@ -1758,7 +1759,8 @@ function checkChickenHitByMissile(missile) {
       scene.remove(chicken); // 鶏を一度消す
       chickens.splice(i, 1); // 配列からも削除
       setTimeout(() => {
-        respawnChicken(chicken); // ランダム位置に再配置
+        // ランダムなマップ上の位置で復活
+        respawnChicken(chicken); // 位置をランダムに再設定
         chickens.push(chicken); // 配列に再追加
         scene.add(chicken); // 再度フィールドに追加
       }, 1200); // エフェクト後に再出現
@@ -1984,9 +1986,7 @@ function animate() {
     updateLocalMissiles();
     checkAllChickenHits();
     // 鶏の移動
-    for (const chicken of chickens) {
-      moveChickenSlowly(chicken);
-    }
+    maintainNPCs();
     updateMyNameObjPosition();
     Object.values(peers).forEach(updateNameObjPosition);
     // Object.values(peers).forEach(peer => {
@@ -2079,4 +2079,15 @@ function spawnGameObjects() {
   spawnCoinsAtSky(16);
   // 鶏
   spawnChickens();
+}
+
+// --- NPCの動作・管理を毎フレーム処理 ---
+function maintainNPCs() {
+  // 鶏の移動（既存）
+  for (const chicken of chickens) {
+    moveChickenSlowly(chicken);
+  }
+  // --- ここに他のNPCの管理処理を追加可 ---
+  // 例: 車や飛行機などのNPCがあればここで移動やAI処理を行う
+  // for (const npc of npcs) { ... }
 }
