@@ -1381,7 +1381,7 @@ window.addEventListener('DOMContentLoaded', () => {
   rankingDiv.style.background = 'rgba(255,255,255,0.85)';
   rankingDiv.style.color = '#333';
   rankingDiv.style.padding = '8px 16px';
-  rankingDiv.style.zIndex = 1000;
+  rankingDiv.style.zIndex = 9999;
   rankingDiv.style.fontSize = '16px';
   rankingDiv.style.borderRadius = '8px';
   rankingDiv.style.minWidth = '180px';
@@ -1610,43 +1610,33 @@ function showHitEffect() {
     effect.style.left = 0;
     effect.style.width = '100vw';
     effect.style.height = '100vh';
-    effect.style.background = 'rgba(255,0,0,0.25)';
+    effect.style.background = 'rgba(255,0,0,0.38)';
     effect.style.pointerEvents = 'none';
     effect.style.zIndex = 9999;
-    effect.style.transition = 'opacity 0.4s';
+    effect.style.transition = 'opacity 0.12s, transform 0.12s';
     effect.style.opacity = '0';
+    effect.style.transform = 'scale(1)';
     document.body.appendChild(effect);
   }
   effect.style.opacity = '1';
-  setTimeout(() => { effect.style.opacity = '0'; }, 250);
+  effect.style.transform = 'scale(1.07)';
+  setTimeout(() => {
+    effect.style.opacity = '0';
+    effect.style.transform = 'scale(1)';
+  }, 180);
 }
 
-// --- オンライン同期ミサイルの移動 ---
-for (const [mid, m] of Object.entries(allMissiles)) {
-  m.mesh.position.addScaledVector(m.dir, 1.5);
-  m.life++;
-  if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
-    channel && channel.publish('hit', { targetId: myId });
-    scene.remove(m.mesh);
-    delete allMissiles[mid];
-    handlePlayerHit(myId); // 自分が撃墜された時の処理を呼び出す
-    continue;
-  }
-  if (m.ownerId === myId) {
-    for (const pid in peers) {
-      const peer = peers[pid];
-      if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
-        channel && channel.publish('hit', { targetId: pid });
-        scene.remove(m.mesh);
-        delete allMissiles[mid];
-        break;
-      }
-    }
-  }
-  if (m.life > 60) {
-    scene.remove(m.mesh);
-    delete allMissiles[mid];
-  }
+// --- ランダムリスポーン位置取得 ---
+function getRandomRespawnPosition() {
+  let tries = 0, x, z, y;
+  do {
+    // 安全な範囲でリスポーン（中心±TERRAIN_SIZE*0.45、地形の高さ8-35の範囲）
+    x = (Math.random() - 0.5) * TERRAIN_SIZE * 0.9;
+    z = (Math.random() - 0.5) * TERRAIN_SIZE * 0.9;
+    y = getTerrainHeight(x, z);
+    tries++;
+  } while ((y < 8 || y > 35) && tries < 10);
+  return new THREE.Vector3(x, y + 3, z); // 少し浮かせる
 }
 
 // --- プレイヤーが撃たれた時の処理 ---
@@ -1654,16 +1644,19 @@ function handlePlayerHit(targetId) {
   if (targetId === myId) {
     if (hp > 0) {
       hp--;
+      // スコア加算（被弾時）
+      score += 1;
       updateInfo();
       updateHeartDisplay(bird, hp);
       showHitEffect && showHitEffect();
       playHitSound && playHitSound();
       if (hp <= 0) {
-        bird.position.set(0, 6, 0); // リスポーン位置に移動
+        // ランダムなリスポーン位置に移動
+        const pos = getRandomRespawnPosition();
+        bird.position.set(pos.x, pos.y, pos.z);
         hp = maxHP;
         updateInfo();
         updateHeartDisplay(bird, hp);
-        // 自分の復活を他プレイヤーに通知（state送信）
         if (typeof sendState === 'function') sendState();
       }
     }
@@ -1676,7 +1669,6 @@ function handlePlayerHit(targetId) {
         peer.group.visible = false;
       }
     }
-    // HPが1以上に回復した場合は必ず再表示
     if (peer.hp > 0) {
       peer.group.visible = true;
     }
