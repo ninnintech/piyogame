@@ -1974,9 +1974,9 @@ function setupInput() {
         btn.addEventListener('contextmenu', (e) => e.preventDefault()); // 右クリックメニュー阻止
     };
 
-    setupButton('forward-btn', () => move.up = 1, () => move.up = 0); // 上昇ボタンに変更？
-    setupButton('missile-btn', () => {if(hp>0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3()))});
-    setupButton('dash-btn', () => {if(hp>0) startDash()});
+    // setupButton('forward-btn', () => move.up = 1, () => move.up = 0); // 上昇ボタンに変更？
+    // setupButton('missile-btn', () => {if(hp>0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3()))});
+    // setupButton('dash-btn', () => {if(hp>0) startDash()});
     // 例: 下降ボタン
     // setupButton('down-btn', () => move.up = -1, () => move.up = 0);
 }
