@@ -1915,3 +1915,13 @@ window.addEventListener('beforeunload', () => {
   const bgmAudio = document.getElementById('bgm-audio');
   if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
 });
+
+// --- ヒット効果音再生 ---
+function playHitSound() {
+  const hitAudio = document.getElementById('hit-audio');
+  if (hitAudio) {
+    hitAudio.currentTime = 0;
+    hitAudio.volume = 0.7;
+    hitAudio.play().catch(()=>{});
+  }
+}
