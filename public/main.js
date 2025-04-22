@@ -1786,43 +1786,57 @@ function animate() {
     if (typeof checkCoinCollision === 'function') checkCoinCollision();
     if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
     renderer.render(scene, camera);
-
-// --- サブスクライブ: 他プレイヤーの状態反映 ---
-// channel.subscribe('state', (msg) => {
-//   const s = msg.data;
-//   if (s.id === myId) return; // 自分は除外
-//   if (!peers[s.id]) {
-//     peers[s.id] = createPeerBird(s);
-//     scene.add(peers[s.id].group);
-//   }
-//   const peer = peers[s.id];
-//   peer.group.position.set(s.x, s.y, s.z);
-//   peer.group.rotation.y = s.ry;
-//   setBirdColor(peer.group, s.color);
-//   peer.nameObj.element.textContent = s.name;
-//   updateNameObjPosition(peer);
-//   // HP/スコア
-//   if (typeof msg.hp === 'number') peer.hp = msg.hp;
-//   if (typeof msg.score === 'number') peer.score = msg.score;
-// });
-
-// --- ミサイル発射 ---
-function fireMissile() {
-  if (!channel) return; // チャンネルが初期化されていなければ処理しない
-  
-  playShotSound();
-  const dir = new THREE.Vector3(Math.sin(bird.rotation.y), 0, Math.cos(bird.rotation.y));
-  launchLocalMissile(bird.position, dir);
-  channel.publish('fire', {
-    id: myId,
-    x: bird.position.x,
-    y: bird.position.y,
-    z: bird.position.z,
-    dx: dir.x,
-    dy: dir.y,
-    dz: dir.z
-  });
+  } catch (e) {
+    if (!animate.lastError || animate.lastError !== String(e)) {
+      animate.lastError = String(e);
+      console.error("[animate] エラー発生:", e);
+      let errDiv = document.getElementById('error-log');
+      if (!errDiv) {
+        errDiv = document.createElement('div');
+        errDiv.id = 'error-log';
+        errDiv.style.position = 'fixed';
+        errDiv.style.bottom = '10px';
+        errDiv.style.left = '10px';
+        errDiv.style.background = 'rgba(255,0,0,0.85)';
+        errDiv.style.color = '#fff';
+        errDiv.style.padding = '12px 24px';
+        errDiv.style.zIndex = 9999;
+        errDiv.style.fontSize = '16px';
+        errDiv.style.borderRadius = '8px';
+        document.body.appendChild(errDiv);
+      }
+      errDiv.textContent = '[animate] エラー: ' + (e && e.stack ? e.stack : e);
+    }
+  } finally {
+    requestAnimationFrame(animate);
+  }
 }
+
+animate();
+
+// --- スマホで画面切り替えや閉じる時に通信/BGMを止める ---
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // 通信切断
+    if (channel) {
+      channel.presence.leave && channel.presence.leave();
+      channel.detach && channel.detach();
+    }
+    if (ably) ably.close && ably.close();
+    // BGM停止
+    const bgmAudio = document.getElementById('bgm-audio');
+    if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
+  }
+});
+window.addEventListener('beforeunload', () => {
+  if (channel) {
+    channel.presence.leave && channel.presence.leave();
+    channel.detach && channel.detach();
+  }
+  if (ably) ably.close && ably.close();
+  const bgmAudio = document.getElementById('bgm-audio');
+  if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
+});
 
 // --- ヒット効果音再生 ---
 function playHitSound() {
@@ -1832,6 +1846,8 @@ function playHitSound() {
     hitAudio.volume = 0.7;
     hitAudio.play().catch(()=>{});
   }
+}
+
 }
 
 // --- 大きなハート回復アイテム管理 ---
@@ -2095,43 +2111,3 @@ function removeDashEffect() {
   } finally {
     requestAnimationFrame(animate);
   }
-
-
-animate();
-
-// --- スマホで画面切り替えや閉じる時に通信/BGMを止める ---
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // 通信切断
-    if (channel) {
-      channel.presence.leave && channel.presence.leave();
-      channel.detach && channel.detach();
-    }
-    if (ably) ably.close && ably.close();
-    // BGM停止
-    const bgmAudio = document.getElementById('bgm-audio');
-    if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
-  }
-});
-window.addEventListener('beforeunload', () => {
-  if (channel) {
-    channel.presence.leave && channel.presence.leave();
-    channel.detach && channel.detach();
-  }
-  if (ably) ably.close && ably.close();
-  const bgmAudio = document.getElementById('bgm-audio');
-  if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
-});
-
-// --- ヒット効果音再生 ---
-function playHitSound() {
-  const hitAudio = document.getElementById('hit-audio');
-  if (hitAudio) {
-    hitAudio.currentTime = 0;
-    hitAudio.volume = 0.7;
-    hitAudio.play().catch(()=>{});
-  }
-}
-
-}
-
