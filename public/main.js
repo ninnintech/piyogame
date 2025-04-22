@@ -2181,6 +2181,11 @@ function updatePlayerMovement(deltaTime) {
     const baseSpeed = 25.0; // 基本速度 (単位/秒)
     const turnRate = 2.5; // 旋回速度 (ラジアン/秒)
     const upDownSpeed = 15.0; // 上昇/下降速度
+    // --- 追加する処理 ---
+// 上昇・下降
+if (move.up !== 0) {
+    nextPosition.y += move.up * upDownSpeed * deltaTime;
+}
 
     let currentSpeed = baseSpeed;
     if (dashActive) currentSpeed *= 2.5; // ダッシュ中は速度アップ
