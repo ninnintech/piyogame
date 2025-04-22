@@ -1610,12 +1610,15 @@ async function setupRealtimeConnection() {
             if (!Array.isArray(members)) {
                 if (members && typeof members.items === 'function') {
                     // Iterableな場合（Ably SDKのバージョンによってはitems()で取得）
-                    members = Array.from(members.items());
+                    members = Array.from(members.items ? members.items() : members);
                 } else if (members && typeof members === 'object' && typeof members.length === 'number') {
                     // 配列風オブジェクト
                     members = Array.prototype.slice.call(members);
+                } else if (members && typeof members === 'object') {
+                    // オブジェクト型（MapやSet）を考慮し、値だけ抽出
+                    members = Array.from(Object.values(members));
                 } else {
-                    console.error("Presence情報の取得エラー: membersが配列ではありません", members);
+                    console.error("Presence情報の取得エラー: membersが配列でもイテレータでもありません", members);
                     userCount = 0;
                     updateInfo();
                     return;
