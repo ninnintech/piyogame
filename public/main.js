@@ -2011,13 +2011,7 @@ window.addEventListener('DOMContentLoaded', () => {
         console.error("ログイン画面の初期化エラー:", e);
     }
 });
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        showLogin();
-    } catch (e) {
-        console.error("ログイン画面の初期化エラー:", e);
-    }
-});
+
 window.addEventListener('resize', () => {
     if (camera && renderer) {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -2313,5 +2307,4 @@ function updateUIElements() {
 
 function renderScene() {
     renderer.render(scene, camera);
-}
 }
