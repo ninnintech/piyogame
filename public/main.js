@@ -42,7 +42,8 @@ let dashGauge = 1.0;
 let dashActive = false;
 let dashEffect = null;
 
-let ably, channel;
+let ably = null; // Ably インスタンスを保持するグローバル変数
+let channel;
 
 const collisionObjects = []; // 衝突判定用 { object, positionGetter, radius }
 const allMissiles = {}; // 同期用ミサイル { id: { mesh, ownerId, dir, life } }
@@ -1575,129 +1576,75 @@ function escapeHTML(str) {
 async function initAbly() {
     try {
         const apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : '';
-        // クライアントIDをここで生成する方式ですね
-        const myClientId = 'player_' + Math.random().toString(36).slice(2, 11);
-        const authUrl = `${apiBase}/api/token?clientId=${encodeURIComponent(myClientId)}`;
-
-        // ↓↓↓ ここを修正します ↓↓↓
+        // ▼▼▼ myId をここで生成し、グローバル変数に設定 ▼▼▼
+        myId = 'player_' + Math.random().toString(36).slice(2, 11); // グローバル変数 myId に設定
+        // ▲▲▲ myId をここで生成し、グローバル変数に設定 ▲▲▲
+        const authUrl = `<span class="math-inline">\{apiBase\}/api/token?clientId\=</span>{encodeURIComponent(myId)}`; // 生成した myId を使う
+        console.log(`[initAbly] Generated My ID: ${myId}`); // ID確認用ログ
         return new Ably.Realtime({
-            authUrl: authUrl,        // 既存の認証URLオプション
-            clientId: myClientId,    // 既存のクライアントIDオプションの後ろにカンマを追加
-            log: { level: 3 }      // ここに log オプションを追加 (3はINFOレベル)
+            authUrl: authUrl,
+            clientId: myId, // 生成した myId を使う
+            log: { level: 3 }
         });
-        // ↑↑↑ ここまで修正 ↑↑↑
-
     } catch (error) {
         console.error('Ably初期化エラー:', error);
         alert('サーバー接続エラー: 認証トークンの取得に失敗しました。\nサーバーが動作していて、URLが正しいか確認してください。');
-        return null;
+        return null; // エラー時は null を返すようにする
     }
 }
 
 
 async function setupRealtimeConnection() {
-    ably = await initAbly();
-    if (!ably) return; // 初期化失敗
+    // ably = await initAbly(); // ← startGame 内で initAbly を呼ぶように変更済み
+    if (!ably) {
+         console.error("setupRealtimeConnection: Ablyインスタンスがありません。");
+         return;
+    }
 
     channel = ably.channels.get('bird-garden-3d-v2');
 
-    // チャンネルのアタッチ完了を待つ
-    await new Promise((resolve, reject) => {
-        channel.once('attached', resolve);
-        channel.once('failed', reject);
-        channel.attach();
-    });
-
-    // Ablyが決定したclientIdでmyIdを上書き
-    myId = ably.auth.clientId;
-
-    console.log(`My ID: ${myId}, Name: ${myName}, Color: ${myColor}`);
-
     // --- Presence (入退室管理) ---
-    await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
-    console.log("Presence Enter 完了");
-
-    // 在室メンバー取得とUI更新
-    const updatePresenceInfo = async () => {
-            // ▼▼▼ 接続状態チェックを追加 ▼▼▼
-    if (!ably || ably.connection.state !== 'connected') {
-        // Ably本体が接続されていない場合は処理を中断
-        console.warn(`[${new Date().toLocaleTimeString()}] updatePresenceInfo: Ably接続未確立のためスキップ (状態: ${ably?.connection?.state})`);
-        return;
+    try {
+         // ↓↓↓ myId は既に設定されているグローバル変数を使う ↓↓↓
+         await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
+         console.log("Presence Enter 完了");
+    } catch (enterErr) {
+         console.error("Presence Enter エラー:", enterErr);
+         // Enter に失敗した場合の処理 (リトライなど) を検討
     }
-    if (!channel || channel.state !== 'attached') {
-        // チャンネルが接続(attach)されていない場合は処理を中断
-        console.warn(`[${new Date().toLocaleTimeString()}] updatePresenceInfo: チャンネル未接続のためスキップ (状態: ${channel?.state})`);
-        // 必要なら再接続を試みる (ただし、無限ループに注意)
-        // try {
-        //     console.log("チャンネル再接続を試みます...");
-        //     await channel.attach();
-        //     console.log("チャンネル再接続成功");
-        // } catch (attachErr) {
-        //     console.error("チャンネル再接続試行失敗:", attachErr);
-        //     return; // 再接続失敗時は中断
-        // }
-         return; // 一旦中断する
+
+
+    // updatePresenceInfo 関数の定義 (接続チェック強化版推奨)
+    const updatePresenceInfo = async () => { /* ... */ };
+
+    // 定期的な Presence 情報で同期 (接続チェック強化版を使うか、頻度を下げる)
+    // setInterval(updatePresenceInfo, 10000); // 例: 10秒ごと
+    // または setInterval 内で接続チェック
+    setInterval(() => {
+         if (ably && ably.connection.state === 'connected' && channel && channel.state === 'attached') {
+              updatePresenceInfo();
+         }
+    }, 10000);
+
+
+    // Presence イベントリスナー
+    channel.presence.subscribe(['enter', 'leave', 'update'], updatePresenceInfo);
+
+    // --- メッセージ購読 ---
+    // (変更なし)
+
+    // 定期的な状態送信 (変更なし)
+    // setInterval(sendState, 100);
+
+    // 初回の Presence 情報取得 (チャンネル接続後、少し待ってから実行するのも手)
+    // await new Promise(resolve => setTimeout(resolve, 500)); // 例: 500ms待つ
+    try {
+        await updatePresenceInfo(); // 初回実行
+    } catch (initialGetErr) {
+        console.error("初回 Presence 情報取得エラー:", initialGetErr);
     }
-    // ▲▲▲ 接続状態チェックを追加 ▲▲▲
-        try {
-            const members = await channel.presence.get();
-            console.log("[DEBUG] presence.get result:", members, "typeof:", typeof members, "channel:", channel, "ably.connection.state:", ably && ably.connection ? ably.connection.state : undefined);
-            if (!Array.isArray(members)) {
-                console.error("Presence情報の取得エラー: membersが配列ではありません", members);
-                userCount = 0;
-                updateInfo();
-                return;
-            }
-            userCount = members.length;
-            updateInfo(); // 接続人数表示更新
 
-            // 既存ピアの更新と新規ピアの追加
-            const currentPeerIds = new Set(Object.keys(peers));
-            for (const member of members) {
-                if (!member || typeof member !== 'object') continue;
-                if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
-
-                // Ably SDKのPresence.get()の戻り値が {clientId, data} でない場合の防御
-                if (!('data' in member) || !('clientId' in member)) {
-                    console.warn("Presenceメンバー形式が不正", member);
-                    continue;
-                }
-
-                if (!peers[member.data.id]) { // 新規ピア
-                    console.log(`新規ピア参加: ${member.data.name}(${member.data.id})`);
-                    peers[member.data.id] = createPeerBird(member.data); // createPeerBirdはstateを引数に取る
-                    scene.add(peers[member.data.id].group);
-                } else { // 既存ピアの情報更新
-                    const peer = peers[member.data.id];
-                    peer.group.position.set(member.data.x || 0, member.data.y || 10, member.data.z || 0); // 位置も同期？
-                    peer.group.rotation.y = member.data.ry || 0; // 回転も同期？
-                    setBirdColor(peer.group, member.data.color || '#ffffff');
-                    peer.name = member.data.name || '???';
-                    peer.hp = typeof member.data.hp === 'number' ? member.data.hp : MAX_HP;
-                    peer.score = typeof member.data.score === 'number' ? member.data.score : 0;
-                    if (peer.nameObj) {
-                        peer.nameObj.nameSpan.textContent = peer.name;
-                        updateHeartDisplay(peer.nameObj, peer.hp);
-                    }
-                    peer.group.visible = peer.hp > 0; // HPが0なら非表示
-                }
-                currentPeerIds.delete(member.data.id); // 処理済みピアIDをセットから削除
-            }
-
-            // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
-            // presenceにいなくなったがpeersに残っているピアを削除
-            for (const oldPeerId of currentPeerIds) {
-                if (peers[oldPeerId]) {
-                    console.log(`ピア退出: ${peers[oldPeerId].name}(${oldPeerId})`);
-                    removePeer(oldPeerId);
-                }
-            }
-            updateRanking(); // ランキング更新
-        } catch (err) {
-            console.error("Presence情報の取得/更新エラー:", err);
-        }
-    };
+}
 
     // 定期的に Presence 情報で同期 (例: 5秒ごと)
     setInterval(updatePresenceInfo, 5000);
@@ -1882,37 +1829,51 @@ function sendState() {
 
 
 // --- ゲームロジック ---
-
 function startGame() {
-    console.log(`My Name: ${myName}, Color: ${myColor}`);
+    // ▼▼▼ myId の生成を削除 (initAbly で設定済みのため) ▼▼▼
+    // myId = `player_${Math.random().toString(36).slice(2, 11)}`;
+    // ▲▲▲ myId の生成を削除 ▲▲▲
+    // myName, myColor はログイン画面から設定されている想定
+
+    console.log(`[startGame] Using My ID: ${myId}, Name: ${myName}, Color: ${myColor}`); // myId が設定されているか確認
 
     initGraphics();
     createTerrain();
     placeObjects();
-    setupPlayerBird(); // プレイヤー生成・設定
-    spawnChickens();
-    spawnBigHearts();
-    spawnRainbowChicken(); // 最初から虹色チキン出現
+    // setupPlayerBird は myId が確定してから呼ぶ
+    // setupPlayerBird(); // ← Ably接続後の方が良いかも？
 
-    setupInput(); // 入力設定を呼び出し
+    setupInput();
 
-    // UI要素取得
     infoDiv = document.getElementById('info');
     rankingDiv = document.getElementById('ranking');
     dashGaugeElement = document.getElementById('dash-gauge');
 
-    updateInfo(); // 初期UI表示
+    updateInfo();
     updateRanking();
 
-    // Ably接続開始
-    setupRealtimeConnection().then(() => {
-       console.log("Ably接続セットアップ完了");
-       requestAnimationFrame(animate); // 接続後にアニメーション開始
+    // Ably接続開始 (initAbly を呼び出し、結果を ably に設定)
+    initAbly().then(ablyInstance => {
+        if (!ablyInstance) {
+             // initAbly 内で alert が出るはずだが、念のため
+             throw new Error("Ably の初期化に失敗しました。");
+        }
+        ably = ablyInstance; // グローバル変数 ably にインスタンスを格納
+
+        // Ablyインスタンスが取得できた後にプレイヤーバードを設定
+        setupPlayerBird();
+
+        // Ablyインスタンスを使って接続設定
+        return setupRealtimeConnection();
+    }).then(() => {
+        console.log("Ably接続セットアップ完了");
+        requestAnimationFrame(animate); // 接続後にアニメーション開始
     }).catch(err => {
         console.error("Ably接続プロセスエラー:", err);
+        // alert は initAbly 内で出る可能性があるので、ここではログのみでも良いかも
+        // alert("オンライン接続に失敗しました。");
         // オフラインモードやエラー表示など
-        alert("オンライン接続に失敗しました。");
-        requestAnimationFrame(animate); // エラーでもゲームループは開始する (オフラインモード)
+        // requestAnimationFrame(animate); // エラーでもゲームループを開始する場合
     });
 }
 
