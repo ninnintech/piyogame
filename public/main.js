@@ -381,28 +381,36 @@ function createChicken(isGold = false) {
 }
 
 function randomChickenPosition() {
-  // X,Z: 中心±TERRAIN_SIZE*0.3, Y: 40〜80の空中
-  return new THREE.Vector3(
-    (Math.random() - 0.5) * TERRAIN_SIZE * 0.6,
-    40 + Math.random() * 40,
-    (Math.random() - 0.5) * TERRAIN_SIZE * 0.6
-  );
-}
-
-function spawnChickens() {
-  // 1体は金色、残りはランダム色
-  for (let i = 0; i < CHICKEN_COUNT; i++) {
-    const isGold = (i === 0); // 1体だけ金色
-    const chicken = createChicken(isGold);
-    chicken.position.copy(randomChickenPosition());
-    chickens.push(chicken);
-    scene.add(chicken);
-    addCollisionObject(chicken, 4); // 衝突判定用のオブジェクトを追加
-  }
+  let x, y, z, tries = 0;
+  do {
+    x = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
+    z = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
+    y = getTerrainHeight(x, z) + 7 + Math.random() * 6;
+    tries++;
+  } while (tries < 10 && checkCollision(new THREE.Vector3(x, y, z), 2).collided);
+  return new THREE.Vector3(x, y, z);
 }
 
 function respawnChicken(chicken) {
   chicken.position.copy(randomChickenPosition());
+}
+
+// --- 鶏の移動関数 ---
+function moveChickenSlowly(chicken) {
+  // ゆっくり・ふわふわ飛び回る動き
+  if (!chicken.userData.basePos) {
+    chicken.userData.basePos = chicken.position.clone();
+    chicken.userData.phase = Math.random() * Math.PI * 2;
+    chicken.userData.radius = 55 + Math.random() * 60;
+    // 通常の鶏はさらに遅く
+    chicken.userData.speed = chicken.userData.isGold ? 0.00013 + Math.random() * 0.00007 : 0.00015 + Math.random() * 0.00009;
+    chicken.userData.height = 38 + Math.random() * 20;
+  }
+  const now = performance.now();
+  chicken.position.x = chicken.userData.basePos.x + Math.cos(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.z = chicken.userData.basePos.z + Math.sin(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
+  chicken.position.y = chicken.userData.height + Math.sin(now * 0.0008 + chicken.userData.phase) * 7;
+  chicken.rotation.y = Math.PI/2 - (now * chicken.userData.speed + chicken.userData.phase);
 }
 
 // --- 鳥の消滅エフェクト ---
@@ -436,6 +444,36 @@ function spawnChickenEffect(pos, isGold) {
     }
     animateParticle();
   }
+}
+
+// --- 花火エフェクト ---
+function spawnFireworkEffect(position) {
+  // シンプルなパーティクル花火（Three.js）
+  const group = new THREE.Group();
+  for (let i = 0; i < 32; i++) {
+    const geo = new THREE.SphereGeometry(0.18, 8, 8);
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(`hsl(${Math.floor(Math.random()*360)}, 90%, 60%)`) });
+    const p = new THREE.Mesh(geo, mat);
+    const angle = Math.random() * Math.PI * 2;
+    const elev = Math.random() * Math.PI;
+    const r = 3 + Math.random() * 2;
+    p.position.set(
+      position.x + Math.sin(elev) * Math.cos(angle) * r,
+      position.y + Math.cos(elev) * r,
+      position.z + Math.sin(elev) * Math.sin(angle) * r
+    );
+    group.add(p);
+    // 拡散アニメーション
+    const dx = (p.position.x - position.x) * 1.2;
+    const dy = (p.position.y - position.y) * 1.2;
+    const dz = (p.position.z - position.z) * 1.2;
+    setTimeout(() => {
+      p.position.set(position.x + dx, position.y + dy, position.z + dz);
+      p.material.opacity = 0;
+    }, 400 + Math.random()*200);
+  }
+  scene.add(group);
+  setTimeout(() => scene.remove(group), 900);
 }
 
 // --- 毎フレーム：全ミサイルと全鶏の当たり判定 ---
@@ -593,7 +631,7 @@ function moveChickenSlowly(chicken) {
     chicken.userData.phase = Math.random() * Math.PI * 2;
     chicken.userData.radius = 55 + Math.random() * 60;
     // 通常の鶏はさらに遅く
-    chicken.userData.speed = chicken.userData.isRainbow ? 0.00013 + Math.random() * 0.00007 : 0.00015 + Math.random() * 0.00009;
+    chicken.userData.speed = chicken.userData.isGold ? 0.00013 + Math.random() * 0.00007 : 0.00015 + Math.random() * 0.00009;
     chicken.userData.height = 38 + Math.random() * 20;
   }
   const now = performance.now();
@@ -1687,9 +1725,8 @@ function checkCoinCollision() {
     if (distance < 3.2) {
       score++;
       updateInfo();
+      if (channel) channel.publish('hp_score', { id: myId, hp, score }); // スコア同期
       playCoinSound && playCoinSound();
-      // スコア更新を全員に通知
-      if (channel) channel.publish('hp_score', { id: myId, hp, score });
       coins.splice(i, 1);
       scene.remove(c);
       spawnCoin(); // 新たなコインを即出現
@@ -1713,6 +1750,7 @@ function checkChickenHitByMissile(missile) {
       // スコア加算（金色は2倍）
       score++;
       updateInfo();
+      if (channel) channel.publish('hp_score', { id: myId, hp, score }); // スコア同期
       spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
       playBakuhaSound();
       scene.remove(chicken); // 鶏を一度消す
@@ -1738,63 +1776,24 @@ function checkPlayerHitByMissile() {
     const m = missiles[i];
     if (m.mesh.position.distanceTo(bird.position) < 2.4) {
       // サーバーにヒット通知
-      if (channel) channel.publish('hit', { targetId: myId });
+      if (channel) channel.publish('player_hit', { targetId: myId, attackerId: m.ownerId || myId });
       scene.remove(m.mesh);
       missiles.splice(i, 1);
-      handlePlayerHit(myId); // 自分が撃墜された時の処理
+      // handlePlayerHit(myId); // 旧ローカル処理は不要
       break;
     }
   }
 }
 
-// --- NPC（空を飛ぶ鳥・虫） ---
-function spawnNPC() {
-  const t = NPC_TYPES[Math.random() < 0.5 ? 0 : 1];
-  let mesh;
-  if (t.type === 'bird') {
-    mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.7 * t.scale, 10, 8),
-      new THREE.MeshLambertMaterial({ color: t.color })
-    );
-  } else {
-    mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.35, 8, 6),
-      new THREE.MeshLambertMaterial({ color: t.color })
-    );
-  }
-  mesh.position.set(
-    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9,
-    6 + Math.random() * 20,
-    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9
-  );
-  mesh.userData = {
-    type: t.type,
-    dir: new THREE.Vector3(
-      (Math.random() - 0.5) * 0.6,
-      (Math.random() - 0.5) * 0.12,
-      (Math.random() - 0.5) * 0.6
-    ).normalize(),
-    speed: 0.1 + Math.random() * 0.15
-  };
-  npcs.push(mesh);
-  scene.add(mesh);
-  addCollisionObject(mesh, 2); // 衝突判定用のオブジェクトを追加
-}
-function maintainNPCs() {
-  while (npcs.length < 15) spawnNPC();
-}
-
-// --- 消滅サウンド ---
-function playMetuSound() {
-  const metu = document.getElementById('metu-audio');
-  if (metu) {
-    metu.currentTime = 0;
-    metu.volume = 0.8;
-    metu.play().catch(()=>{});
+// --- ヒット音再生 ---
+function playHitSound() {
+  const hitAudio = document.getElementById('hit-audio');
+  if (hitAudio) {
+    hitAudio.currentTime = 0;
+    hitAudio.volume = 0.8;
+    hitAudio.play().catch(()=>{});
   }
 }
-
-// --- ヒット時の処理強化 ---
 function handlePlayerHitRealtime(targetId, attackerId) {
   if (targetId === myId) {
     hp = Math.max(0, hp - 1);
@@ -1804,7 +1803,8 @@ function handlePlayerHitRealtime(targetId, attackerId) {
     playUkeSound();
     if (hp <= 0) {
       bird.visible = false;
-      playMetuSound(); // 自分が消滅したとき
+      playMetuSound();
+      spawnFireworkEffect(bird.position); // 花火エフェクト
       setTimeout(() => {
         respawnPlayerRandom();
         bird.visible = true;
@@ -1815,23 +1815,39 @@ function handlePlayerHitRealtime(targetId, attackerId) {
     score += 10;
     updateInfo();
     playHitSound();
+    if (channel) channel.publish('hp_score', { id: myId, hp, score }); // スコア同期
   }
-  // スコア/HP同期
-  if (channel) channel.publish('hp_score', { id: myId, hp, score });
+  // スコア/HP同期（撃墜された側も）
+  if (channel && targetId === myId) channel.publish('hp_score', { id: myId, hp, score });
 }
-
-// --- Ably同期: ヒット・リスポーン・スコア/HP ---
-if (channel) {
-  channel.subscribe('player_hit', (msg) => {
-    const { targetId, attackerId } = msg.data;
-    handlePlayerHitRealtime(targetId, attackerId);
-    // 消滅時、撃墜側にもサウンド
-    if (peers[targetId] && peers[targetId].hp === 0) {
-      playMetuSound(); // 撃墜したプレイヤーにも
+function checkPlayerHitByMissile() {
+  if (typeof hp !== 'number' || hp <= 0) return;
+  for (let i = missiles.length - 1; i >= 0; i--) {
+    const m = missiles[i];
+    if (m.mesh.position.distanceTo(bird.position) < 2.4) {
+      // サーバーにヒット通知
+      if (channel) channel.publish('player_hit', { targetId: myId, attackerId: m.ownerId || myId });
+      scene.remove(m.mesh);
+      missiles.splice(i, 1);
+      // handlePlayerHit(myId); // 旧ローカル処理は不要
+      break;
     }
-  });
+  }
 }
-
+function respawnPlayerRandom() {
+  // ランダムな位置を生成（地形上の有効範囲内）
+  let x, y, z, tries = 0;
+  do {
+    x = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
+    z = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
+    y = getTerrainHeight(x, z) + 7 + Math.random() * 6;
+    tries++;
+  } while (tries < 10 && checkCollision(new THREE.Vector3(x, y, z), 2).collided);
+  bird.position.set(x, y, z);
+  hp = maxHP;
+  updateInfo();
+  updateHeartDisplay(bird, hp);
+}
 function animate() {
   try {
     // コイン演出
@@ -2074,14 +2090,4 @@ function spawnGameObjects() {
   spawnCoinsAtSky(16);
   // 鶏
   spawnChickens();
-}
-
-// --- ヒット音再生 ---
-function playHitSound() {
-  const hitAudio = document.getElementById('hit-audio');
-  if (hitAudio) {
-    hitAudio.currentTime = 0;
-    hitAudio.volume = 0.8;
-    hitAudio.play().catch(()=>{});
-  }
 }
