@@ -2149,5 +2149,5 @@ function renderScene() {
 
 window.addEventListener('DOMContentLoaded', () => {
     initGraphics();
-    showLogin();
+    setupRealtimeConnection.showLogin();
 });
