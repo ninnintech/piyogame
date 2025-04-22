@@ -1592,6 +1592,13 @@ async function setupRealtimeConnection() {
 
     channel = ably.channels.get('bird-garden-3d-v2'); // チャンネル名変更推奨
 
+    // チャンネルのアタッチ完了を待つ
+    await new Promise((resolve, reject) => {
+        channel.once('attached', resolve);
+        channel.once('failed', reject);
+        channel.attach();
+    });
+
     // --- Presence (入退室管理) ---
     await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
     console.log("Presence Enter 完了");
