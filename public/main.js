@@ -1752,22 +1752,7 @@ function checkChickenHitByMissile(missile) {
   }
 }
 
-// --- プレイヤーがミサイルでヒットしたか判定し、必要に応じて処理を行う ---
-function checkPlayerHitByMissile() {
-  // ローカルミサイルが自分自身に当たったか判定（多重処理防止のためhp>0のみ）
-  if (typeof hp !== 'number' || hp <= 0) return;
-  for (let i = missiles.length - 1; i >= 0; i--) {
-    const m = missiles[i];
-    if (m.mesh.position.distanceTo(bird.position) < 2.4) {
-      // サーバーにヒット通知
-      if (channel) channel.publish('player_hit', { targetId: myId, attackerId: m.ownerId || myId });
-      scene.remove(m.mesh);
-      missiles.splice(i, 1);
-      // handlePlayerHit(myId); // 旧ローカル処理は不要
-      break;
-    }
-  }
-}
+
 
 // --- ヒット音再生 ---
 function playHitSound() {
