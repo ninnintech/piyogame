@@ -1576,12 +1576,12 @@ async function initAbly() {
     try {
         const apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : '';
         const response = await fetch(`${apiBase}/api/token`);
-        if (!response.ok) throw new Error(`トークン取得エラー: ${response.status}`);
+        if (!response.ok) throw new Error(`トークン取得エラー: ${response.status} ${response.statusText}`);
         const tokenRequest = await response.json();
         return new Ably.Realtime({ authCallback: (_, callback) => callback(null, tokenRequest) });
     } catch (error) {
         console.error('Ably初期化エラー:', error);
-        alert('サーバー接続エラー: 認証トークンの取得に失敗しました。\nサーバーが動作しているか、URLが正しいか確認してください。');
+        alert('Ably初期化エラー: ' + (error && error.message ? error.message : error));
         return null;
     }
 }
