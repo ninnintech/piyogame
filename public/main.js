@@ -1288,8 +1288,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ミサイルボタン
   if (missileBtn) {
-    missileBtn.addEventListener('touchstart', fireMissile);
+    // テキスト選択・コピー・シェア等のダイアログ抑制
+    missileBtn.addEventListener('touchstart', function(e) {
+      fireMissile();
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
     missileBtn.addEventListener('mousedown', fireMissile);
+    // 長押し時のコンテキストメニュー抑制
+    missileBtn.addEventListener('contextmenu', function(e) { e.preventDefault(); });
   }
 
   // 突撃ボタン
@@ -1588,7 +1595,7 @@ function checkPlayerHitByMissile() {
   if (typeof hp !== 'number' || hp <= 0) return;
   for (let i = missiles.length - 1; i >= 0; i--) {
     const m = missiles[i];
-    if (m.mesh.position.distanceTo(bird.position) < 1.2) {
+    if (m.mesh.position.distanceTo(bird.position) < 1.8) {
       // サーバーにヒット通知
       if (channel) channel.publish('hit', { targetId: myId });
       scene.remove(m.mesh);
