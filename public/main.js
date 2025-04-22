@@ -14,6 +14,30 @@ let channel = null;
 let ably = null;
 // 必要に応じて他のグローバルも追加
 
+// --- Ably初期化の本実装 ---
+function initAbly() {
+    // Ably APIキーは index.html で window.ABLY_KEY に埋め込まれている前提
+    if (!window.ABLY_KEY) {
+        alert('AblyのAPIキーが設定されていません。');
+        return;
+    }
+    // Ablyインスタンスを生成
+    ably = new Ably.Realtime({ key: window.ABLY_KEY, clientId: myId });
+    // チャンネル名は "bird-garden" で固定（必要に応じて変更可）
+    channel = ably.channels.get('bird-garden');
+
+    // Presence（入室管理）
+    channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
+
+    // メッセージ受信イベント登録例
+    channel.subscribe('hp_update', (msg) => {
+        // 他プレイヤーのHP更新を受信したときの処理例
+        // 例: updateOtherPlayerHP(msg.data.id, msg.data.hp, msg.data.score);
+        // console.log('HP update:', msg.data);
+    });
+    // 必要に応じて他のイベントも登録
+}
+
 // --- 必須: ダミー初期化関数（ゲーム進行に必要な場合） ---
 // 本来は個別ファイルや詳細な処理が必要ですが、
 // ここでは最低限エラーを防ぐためのダミー関数を追加します。
