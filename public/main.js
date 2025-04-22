@@ -2442,5 +2442,3 @@ window.addEventListener('beforeunload', () => {
     if (channel) channel.presence.leave(); // 必ず離脱
     if (ably) ably.close(); // Ably接続を閉じる
 });
-
-```
