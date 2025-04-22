@@ -1822,20 +1822,7 @@ function handlePlayerHitRealtime(targetId, attackerId) {
   // スコア/HP同期（撃墜された側も）
   if (channel && targetId === myId) channel.publish('hp_score', { id: myId, hp, score });
 }
-function checkPlayerHitByMissile() {
-  if (typeof hp !== 'number' || hp <= 0) return;
-  for (let i = missiles.length - 1; i >= 0; i--) {
-    const m = missiles[i];
-    if (m.mesh.position.distanceTo(bird.position) < 2.4) {
-      // サーバーにヒット通知
-      if (channel) channel.publish('player_hit', { targetId: myId, attackerId: m.ownerId || myId });
-      scene.remove(m.mesh);
-      missiles.splice(i, 1);
-      // handlePlayerHit(myId); // 旧ローカル処理は不要
-      break;
-    }
-  }
-}
+
 function respawnPlayerRandom() {
   // ランダムな位置を生成（地形上の有効範囲内）
   let x, y, z, tries = 0;
