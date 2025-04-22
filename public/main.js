@@ -1908,7 +1908,7 @@ function setupInput() {
                 // y: 前後進 (-1:後, 1:前) -> forceで強度調整
                 // x: 左右旋回 (-1:左, 1:右)
                 move.forward = Math.sin(angle) * force * 1.5; // 前後進の感度調整
-                move.turn = Math.cos(angle) * force * 1.5;    // 旋回の感度調整
+                move.turn = Math.cos(angle) * force * 0.5;    // 旋回の感度調整
                 move.forward = Math.max(-1, Math.min(1, move.forward)); // -1から1の範囲に制限
                 move.turn = Math.max(-1, Math.min(1, move.turn));
 
@@ -1931,6 +1931,27 @@ function setupInput() {
         console.warn("nipplejs がロードされていません。");
     }
 
+    function setupInput() {
+        // ...既存のキーボードやジョイスティック設定...
+    
+        // --- モバイル用 上昇・下降ボタン ---
+        const upBtn = document.getElementById('up-btn');
+        const downBtn = document.getElementById('down-btn');
+        if (upBtn) {
+            upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = 1; });
+            upBtn.addEventListener('touchend', (e) => { e.preventDefault(); move.up = 0; });
+            upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; });
+            upBtn.addEventListener('mouseup', (e) => { e.preventDefault(); move.up = 0; });
+            upBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); move.up = 0; });
+        }
+        if (downBtn) {
+            downBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; });
+            downBtn.addEventListener('touchend', (e) => { e.preventDefault(); move.up = 0; });
+            downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; });
+            downBtn.addEventListener('mouseup', (e) => { e.preventDefault(); move.up = 0; });
+            downBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); move.up = 0; });
+        }
+    }
 
     // ボタン入力 (タッチとマウス)
     const setupButton = (id, downCallback, upCallback = null) => {
@@ -2070,6 +2091,8 @@ window.addEventListener('beforeunload', () => {
     if (channel) channel.presence.leave(); // 必ず離脱
     if (ably) ably.close(); // Ably接続を閉じる
 });
+
+
 
 
 // --- アニメーションループ ---
