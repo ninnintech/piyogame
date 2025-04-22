@@ -1614,9 +1614,6 @@ if (channel) {
   });
 }
 
-animate();
-
-// --- メインゲームループ ---
 function animate() {
   try {
     checkBigHeartCollision();
@@ -1683,112 +1680,112 @@ function animate() {
         bird.position.copy(safePos);
         fixCount++;
       }
-// カメラ追従
-camera.position.lerp(
-  new THREE.Vector3(
-    bird.position.x - 12 * Math.sin(bird.rotation.y),
-    bird.position.y + 6,
-    bird.position.z - 12 * Math.cos(bird.rotation.y)
-  ),
-  0.15
-);
-camera.lookAt(bird.position);
+    // カメラ追従
+    camera.position.lerp(
+      new THREE.Vector3(
+        bird.position.x - 12 * Math.sin(bird.rotation.y),
+        bird.position.y + 6,
+        bird.position.z - 12 * Math.cos(bird.rotation.y)
+      ),
+      0.15
+    );
+    camera.lookAt(bird.position);
 
-// 羽ばたきアニメーション
-if (typeof leftWing !== 'undefined' && typeof rightWing !== 'undefined') {
-  wingAngle += 0.15 * wingDir;
-  if (wingAngle > 0.7 || wingAngle < -0.7) wingDir *= -1;
-  leftWing.rotation.x = wingAngle;
-  rightWing.rotation.x = -wingAngle;
-} // ← if文の閉じカッコはここだけ
+    // 羽ばたきアニメーション
+    if (typeof leftWing !== 'undefined' && typeof rightWing !== 'undefined') {
+      wingAngle += 0.15 * wingDir;
+      if (wingAngle > 0.7 || wingAngle < -0.7) wingDir *= -1;
+      leftWing.rotation.x = wingAngle;
+      rightWing.rotation.x = -wingAngle;
+    } // ← if文の閉じカッコはここだけ
 
-// ここからはif文の外！インデントを浅く
-// 車の移動
-if (typeof cars !== 'undefined') {
-  cars.forEach((car, i) => {
-    car.position.x += 0.45 * Math.cos(car.userData.dir);
-    car.position.z += 0.45 * Math.sin(car.userData.dir);
-    if (car.position.x > TERRAIN_SIZE/2) car.position.x = -TERRAIN_SIZE/2;
-    if (car.position.x < -TERRAIN_SIZE/2) car.position.x = TERRAIN_SIZE/2;
-    if (car.position.z > TERRAIN_SIZE/2) car.position.z = -TERRAIN_SIZE/2;
-    if (car.position.z < -TERRAIN_SIZE/2) car.position.z = TERRAIN_SIZE/2;
-  });
-}
-// 飛行機・ヘリコプターの移動
-if (typeof aircrafts !== 'undefined') {
-  for(const a of aircrafts){
-    if(a.userData.type==='airplane'){
-      const rad = 260 + 110*Math.sin(a.userData.phase);
-      const spd = 0.00018 + 0.00012*Math.cos(a.userData.phase);
-      a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
-      a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
-      a.position.y = a.userData.baseY + Math.sin(nowRaw*0.001 + a.userData.phase)*6;
-      a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
-    } else if(a.userData.type==='helicopter'){
-      const rad = 120 + 30*Math.sin(a.userData.phase);
-      const spd = 0.00023 + 0.00015*Math.cos(a.userData.phase);
-      a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
-      a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
-      a.position.y = a.userData.baseY + Math.sin(nowRaw*0.0017 + a.userData.phase)*5;
-      a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
-      a.children[2].rotation.y = nowRaw*0.04;
-      a.children[3].rotation.x = nowRaw*0.12;
+    // ここからはif文の外！インデントを浅く
+    // 車の移動
+    if (typeof cars !== 'undefined') {
+      cars.forEach((car, i) => {
+        car.position.x += 0.45 * Math.cos(car.userData.dir);
+        car.position.z += 0.45 * Math.sin(car.userData.dir);
+        if (car.position.x > TERRAIN_SIZE/2) car.position.x = -TERRAIN_SIZE/2;
+        if (car.position.x < -TERRAIN_SIZE/2) car.position.x = TERRAIN_SIZE/2;
+        if (car.position.z > TERRAIN_SIZE/2) car.position.z = -TERRAIN_SIZE/2;
+        if (car.position.z < -TERRAIN_SIZE/2) car.position.z = TERRAIN_SIZE/2;
+      });
     }
-  }
-}
-// NPC生成・移動
-if (typeof maintainNPCs === 'function') maintainNPCs();
-if (typeof npcs !== 'undefined') {
-  for (const n of npcs) {
-    n.position.addScaledVector(n.userData.dir, n.userData.speed);
-    if (n.position.x < -TERRAIN_SIZE/2 || n.position.x > TERRAIN_SIZE/2) n.userData.dir.x *= -1;
-    if (n.position.y < 3 || n.position.y > 35) n.userData.dir.y *= -1;
-    if (n.position.z < -TERRAIN_SIZE/2 || n.position.z > TERRAIN_SIZE/2) n.userData.dir.z *= -1;
-  }
-}
-// オンライン同期ミサイルの移動＆当たり判定
-if (typeof allMissiles !== 'undefined') {
-  for (const [mid, m] of Object.entries(allMissiles)) {
-    m.mesh.position.addScaledVector(m.dir, 1.5);
-    m.life++;
-    if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
-      channel && channel.publish('hit', { targetId: myId });
-      scene.remove(m.mesh);
-      delete allMissiles[mid];
-      handlePlayerHit(myId);
-      continue;
-    }
-    if (m.ownerId === myId) {
-      for (const pid in peers) {
-        const peer = peers[pid];
-        if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
-          channel && channel.publish('hit', { targetId: pid });
-          scene.remove(m.mesh);
-          delete allMissiles[mid];
-          break;
+    // 飛行機・ヘリコプターの移動
+    if (typeof aircrafts !== 'undefined') {
+      for(const a of aircrafts){
+        if(a.userData.type==='airplane'){
+          const rad = 260 + 110*Math.sin(a.userData.phase);
+          const spd = 0.00018 + 0.00012*Math.cos(a.userData.phase);
+          a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
+          a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
+          a.position.y = a.userData.baseY + Math.sin(nowRaw*0.001 + a.userData.phase)*6;
+          a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
+        } else if(a.userData.type==='helicopter'){
+          const rad = 120 + 30*Math.sin(a.userData.phase);
+          const spd = 0.00023 + 0.00015*Math.cos(a.userData.phase);
+          a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
+          a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
+          a.position.y = a.userData.baseY + Math.sin(nowRaw*0.0017 + a.userData.phase)*5;
+          a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
+          a.children[2].rotation.y = nowRaw*0.04;
+          a.children[3].rotation.x = nowRaw*0.12;
         }
       }
     }
-    if (m.life > 60) {
-      scene.remove(m.mesh);
-      delete allMissiles[mid];
+    // NPC生成・移動
+    if (typeof maintainNPCs === 'function') maintainNPCs();
+    if (typeof npcs !== 'undefined') {
+      for (const n of npcs) {
+        n.position.addScaledVector(n.userData.dir, n.userData.speed);
+        if (n.position.x < -TERRAIN_SIZE/2 || n.position.x > TERRAIN_SIZE/2) n.userData.dir.x *= -1;
+        if (n.position.y < 3 || n.position.y > 35) n.userData.dir.y *= -1;
+        if (n.position.z < -TERRAIN_SIZE/2 || n.position.z > TERRAIN_SIZE/2) n.userData.dir.z *= -1;
+      }
     }
-  }
-}
-// ローカルミサイルの移動
-if (typeof updateLocalMissiles === 'function') updateLocalMissiles();
-if (typeof checkAllChickenHits === 'function') checkAllChickenHits();
-// 鶏の移動
-if (typeof chickens !== 'undefined') {
-  for (const chicken of chickens) {
-    if (typeof moveChickenSlowly === 'function') moveChickenSlowly(chicken);
-  }
-}
-if (typeof updateMyNameObjPosition === 'function') updateMyNameObjPosition();
-if (typeof updateNameObjPosition === 'function') Object.values(peers).forEach(updateNameObjPosition);
-if (typeof checkCoinCollision === 'function') checkCoinCollision();
-if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
-renderer.render(scene, camera);
+    // オンライン同期ミサイルの移動＆当たり判定
+    if (typeof allMissiles !== 'undefined') {
+      for (const [mid, m] of Object.entries(allMissiles)) {
+        m.mesh.position.addScaledVector(m.dir, 1.5);
+        m.life++;
+        if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
+          channel && channel.publish('hit', { targetId: myId });
+          scene.remove(m.mesh);
+          delete allMissiles[mid];
+          handlePlayerHit(myId);
+          continue;
+        }
+        if (m.ownerId === myId) {
+          for (const pid in peers) {
+            const peer = peers[pid];
+            if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
+              channel && channel.publish('hit', { targetId: pid });
+              scene.remove(m.mesh);
+              delete allMissiles[mid];
+              break;
+            }
+          }
+        }
+        if (m.life > 60) {
+          scene.remove(m.mesh);
+          delete allMissiles[mid];
+        }
+      }
+    }
+    // ローカルミサイルの移動
+    if (typeof updateLocalMissiles === 'function') updateLocalMissiles();
+    if (typeof checkAllChickenHits === 'function') checkAllChickenHits();
+    // 鶏の移動
+    if (typeof chickens !== 'undefined') {
+      for (const chicken of chickens) {
+        if (typeof moveChickenSlowly === 'function') moveChickenSlowly(chicken);
+      }
+    }
+    if (typeof updateMyNameObjPosition === 'function') updateMyNameObjPosition();
+    if (typeof updateNameObjPosition === 'function') Object.values(peers).forEach(updateNameObjPosition);
+    if (typeof checkCoinCollision === 'function') checkCoinCollision();
+    if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
+    renderer.render(scene, camera);
   } catch (e) {
     if (!animate.lastError || animate.lastError !== String(e)) {
       animate.lastError = String(e);
@@ -1817,29 +1814,42 @@ renderer.render(scene, camera);
 
 animate();
 
-// --- スマホで画面切り替えや閉じる時に通信/BGMを止める ---
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // 通信切断
-    if (channel) {
-      channel.presence.leave && channel.presence.leave();
-      channel.detach && channel.detach();
-    }
-    if (ably) ably.close && ably.close();
-    // BGM停止
-    const bgmAudio = document.getElementById('bgm-audio');
-    if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
-  }
-});
-window.addEventListener('beforeunload', () => {
-  if (channel) {
-    channel.presence.leave && channel.presence.leave();
-    channel.detach && channel.detach();
-  }
-  if (ably) ably.close && ably.close();
-  const bgmAudio = document.getElementById('bgm-audio');
-  if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
-});
+// --- サブスクライブ: 他プレイヤーの状態反映 ---
+// channel.subscribe('state', (msg) => {
+//   const s = msg.data;
+//   if (s.id === myId) return; // 自分は除外
+//   if (!peers[s.id]) {
+//     peers[s.id] = createPeerBird(s);
+//     scene.add(peers[s.id].group);
+//   }
+//   const peer = peers[s.id];
+//   peer.group.position.set(s.x, s.y, s.z);
+//   peer.group.rotation.y = s.ry;
+//   setBirdColor(peer.group, s.color);
+//   peer.nameObj.element.textContent = s.name;
+//   updateNameObjPosition(peer);
+//   // HP/スコア
+//   if (typeof msg.hp === 'number') peer.hp = msg.hp;
+//   if (typeof msg.score === 'number') peer.score = msg.score;
+// });
+
+// --- ミサイル発射 ---
+function fireMissile() {
+  if (!channel) return; // チャンネルが初期化されていなければ処理しない
+  
+  playShotSound();
+  const dir = new THREE.Vector3(Math.sin(bird.rotation.y), 0, Math.cos(bird.rotation.y));
+  launchLocalMissile(bird.position, dir);
+  channel.publish('fire', {
+    id: myId,
+    x: bird.position.x,
+    y: bird.position.y,
+    z: bird.position.z,
+    dx: dir.x,
+    dy: dir.y,
+    dz: dir.z
+  });
+}
 
 // --- ヒット効果音再生 ---
 function playHitSound() {
@@ -1931,7 +1941,6 @@ startGame = function() {
   origStartGame();
   spawnBigHearts();
 };
-
 
 // --- ピア（他プレイヤー）のHPラベルは常に表示（HP0でも消さない） ---
 function updateNameObjPosition(peer) {
@@ -2088,6 +2097,7 @@ function removeDashEffect() {
     if (typeof checkCoinCollision === 'function') checkCoinCollision();
     if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
     renderer.render(scene, camera);
+   }
   } catch (e) {
     if (!animate.lastError || animate.lastError !== String(e)) {
       animate.lastError = String(e);
@@ -2112,43 +2122,40 @@ function removeDashEffect() {
   } finally {
     requestAnimationFrame(animate);
   }
-}
+
 
 animate();
 
-// --- サブスクライブ: 他プレイヤーの状態反映 ---
-// channel.subscribe('state', (msg) => {
-//   const s = msg.data;
-//   if (s.id === myId) return; // 自分は除外
-//   if (!peers[s.id]) {
-//     peers[s.id] = createPeerBird(s);
-//     scene.add(peers[s.id].group);
-//   }
-//   const peer = peers[s.id];
-//   peer.group.position.set(s.x, s.y, s.z);
-//   peer.group.rotation.y = s.ry;
-//   setBirdColor(peer.group, s.color);
-//   peer.nameObj.element.textContent = s.name;
-//   updateNameObjPosition(peer);
-//   // HP/スコア
-//   if (typeof msg.hp === 'number') peer.hp = msg.hp;
-//   if (typeof msg.score === 'number') peer.score = msg.score;
-// });
+// --- スマホで画面切り替えや閉じる時に通信/BGMを止める ---
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // 通信切断
+    if (channel) {
+      channel.presence.leave && channel.presence.leave();
+      channel.detach && channel.detach();
+    }
+    if (ably) ably.close && ably.close();
+    // BGM停止
+    const bgmAudio = document.getElementById('bgm-audio');
+    if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
+  }
+});
+window.addEventListener('beforeunload', () => {
+  if (channel) {
+    channel.presence.leave && channel.presence.leave();
+    channel.detach && channel.detach();
+  }
+  if (ably) ably.close && ably.close();
+  const bgmAudio = document.getElementById('bgm-audio');
+  if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
+});
 
-// --- ミサイル発射 ---
-function fireMissile() {
-  if (!channel) return; // チャンネルが初期化されていなければ処理しない
-  
-  playShotSound();
-  const dir = new THREE.Vector3(Math.sin(bird.rotation.y), 0, Math.cos(bird.rotation.y));
-  launchLocalMissile(bird.position, dir);
-  channel.publish('fire', {
-    id: myId,
-    x: bird.position.x,
-    y: bird.position.y,
-    z: bird.position.z,
-    dx: dir.x,
-    dy: dir.y,
-    dz: dir.z
-  });
+// --- ヒット効果音再生 ---
+function playHitSound() {
+  const hitAudio = document.getElementById('hit-audio');
+  if (hitAudio) {
+    hitAudio.currentTime = 0;
+    hitAudio.volume = 0.7;
+    hitAudio.play().catch(()=>{});
+  }
 }
