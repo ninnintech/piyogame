@@ -2059,7 +2059,6 @@ function removeDashEffect() {
     if (typeof checkCoinCollision === 'function') checkCoinCollision();
     if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
     renderer.render(scene, camera);
-   }
   } catch (e) {
     if (!animate.lastError || animate.lastError !== String(e)) {
       animate.lastError = String(e);
