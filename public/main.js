@@ -2148,6 +2148,10 @@ function renderScene() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    initGraphics();
-    setupRealtimeConnection.showLogin();
+    try {
+        initGraphics();
+        showLogin();
+    } catch (e) {
+        console.error('初期化エラー:', e);
+    }
 });
