@@ -1729,16 +1729,16 @@ function animate() {
     if (typeof dashActive !== 'undefined' && dashActive) speed *= 3.0;
     // 旋回慣性用変数
     if (typeof turnSpeed === 'undefined') window.turnSpeed = 0;
-    const TURN_ACCEL = 0.001;
+    const TURN_ACCEL = 0.0005;
     const TURN_DECAY = 0.92;
-    const TURN_MAX = 0.01;
+    const TURN_MAX = 0.005;
     if (move.turn !== 0) {
       window.turnSpeed += move.turn * TURN_ACCEL;
       if (window.turnSpeed > TURN_MAX) window.turnSpeed = TURN_MAX;
       if (window.turnSpeed < -TURN_MAX) window.turnSpeed = -TURN_MAX;
     } else {
       window.turnSpeed *= TURN_DECAY;
-      if (Math.abs(window.turnSpeed) < 0.0001) window.turnSpeed = 0;
+      if (Math.abs(window.turnSpeed) < 0.00005) window.turnSpeed = 0;
     }
     if (typeof bird !== 'undefined') {
       bird.rotation.y -= window.turnSpeed;
