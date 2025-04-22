@@ -1601,7 +1601,7 @@ async function setupRealtimeConnection() {
     const updatePresenceInfo = async () => {
         try {
             const members = await channel.presence.get();
-            userCount = members.length;
+            userCount = Array.isArray(members) ? members.length : 0;
             updateInfo(); // 接続人数表示更新
 
             // 既存ピアの更新と新規ピアの追加
