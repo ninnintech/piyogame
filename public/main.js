@@ -1966,14 +1966,14 @@ function addDashEffect() {
     dashEffect.add(mesh);
   }
   bird.add(dashEffect);
-}
+} // ← この閉じカッコが必要！
+
 function removeDashEffect() {
   if (dashEffect) {
     bird.remove(dashEffect);
     dashEffect = null;
   }
 }
-
       // --- ダッシュ中の攻撃判定（鶏） ---
       if (dashActive && Array.isArray(chickens)) {
         for (let i = chickens.length - 1; i >= 0; i--) {
