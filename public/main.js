@@ -1593,46 +1593,7 @@ async function initAbly(clientId) {
     }
 }
 
-// --- ログイン画面 ---
-function showLogin() {
-    const loginModal = document.getElementById('login-modal');
-    const loginBtn = document.getElementById('login-btn');
-    const nameInput = document.getElementById('login-name');
-    const colorInput = document.getElementById('login-color');
 
-    if (!loginModal || !loginBtn || !nameInput || !colorInput) {
-        // ... (エラー処理)
-        return;
-    }
-
-    loginModal.style.display = 'flex';
-
-    loginBtn.onclick = null; // 多重登録防止
-    loginBtn.onclick = async () => { // async 関数に変更
-        const name = nameInput.value.trim();
-        const color = colorInput.value;
-        if (!name) { /* ...名前チェック... */ return; }
-        if (name.length > 12) { /* ...文字数チェック... */ return; }
-
-        myName = name;
-        myColor = color;
-
-        // ▼▼▼ ID生成とAbly初期化をログイン時に行う ▼▼▼
-        myId = 'player_' + Math.random().toString(36).slice(2, 11); // IDをここで生成
-        console.log(`[Login Success] Generated My ID: ${myId}`);
-
-        ably = await initAbly(myId); // ★ 生成したIDでAblyを初期化し、完了を待つ
-        if (!ably) {
-            // initAbly 内で alert が出るので、ここではコンソールログだけでも良いかも
-            console.error("Ablyの初期化に失敗したためゲームを開始できません。");
-            return; // Ably 初期化失敗時はゲームを開始しない
-        }
-        // ▲▲▲ ID生成とAbly初期化 ▲▲▲
-
-        loginModal.style.display = 'none';
-        startGame(); // ★ Ably初期化成功後にゲーム開始
-    };
-}
 
 // --- ゲームロジック ---
 // startGame は Ably 初期化後に呼ばれる前提に変更
