@@ -1786,33 +1786,6 @@ function animate() {
     if (typeof checkCoinCollision === 'function') checkCoinCollision();
     if (typeof checkPlayerHitByMissile === 'function') checkPlayerHitByMissile();
     renderer.render(scene, camera);
-  } catch (e) {
-    if (!animate.lastError || animate.lastError !== String(e)) {
-      animate.lastError = String(e);
-      console.error("[animate] エラー発生:", e);
-      let errDiv = document.getElementById('error-log');
-      if (!errDiv) {
-        errDiv = document.createElement('div');
-        errDiv.id = 'error-log';
-        errDiv.style.position = 'fixed';
-        errDiv.style.bottom = '10px';
-        errDiv.style.left = '10px';
-        errDiv.style.background = 'rgba(255,0,0,0.85)';
-        errDiv.style.color = '#fff';
-        errDiv.style.padding = '12px 24px';
-        errDiv.style.zIndex = 9999;
-        errDiv.style.fontSize = '16px';
-        errDiv.style.borderRadius = '8px';
-        document.body.appendChild(errDiv);
-      }
-      errDiv.textContent = '[animate] エラー: ' + (e && e.stack ? e.stack : e);
-    }
-  } finally {
-    requestAnimationFrame(animate);
-  }
-}
-
-animate();
 
 // --- サブスクライブ: 他プレイヤーの状態反映 ---
 // channel.subscribe('state', (msg) => {
