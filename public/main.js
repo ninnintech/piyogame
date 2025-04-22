@@ -2132,3 +2132,6 @@ function playHitSound() {
     hitAudio.play().catch(()=>{});
   }
 }
+
+}
+}
