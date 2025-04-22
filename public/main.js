@@ -2304,7 +2304,7 @@ function updateAircrafts(deltaTime) {
             if (a.children[3]) a.children[3].rotation.x = now * 40; // テールローター
         }
     }
-
+} // updateAircrafts の閉じカッコを追加
 
 function updateProjectiles() {
     updateMissiles(); // ミサイルの移動、寿命、当たり判定
@@ -2382,4 +2382,10 @@ document.addEventListener('visibilitychange', () => {
         if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
         if (bgm && bgm.paused) bgm.play().catch(()=>{});
     }
+});
+
+// ページを閉じる/移動する前の処理
+window.addEventListener('beforeunload', () => {
+    if (channel) channel.presence.leave(); // 必ず離脱
+    if (ably) ably.close(); // Ably接続を閉じる
 });
