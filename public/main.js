@@ -624,22 +624,7 @@ function scheduleRainbowChickenRespawn() {
 }
 
 // --- 鶏の移動関数 ---
-function moveChickenSlowly(chicken) {
-  // ゆっくり・ふわふわ飛び回る動き
-  if (!chicken.userData.basePos) {
-    chicken.userData.basePos = chicken.position.clone();
-    chicken.userData.phase = Math.random() * Math.PI * 2;
-    chicken.userData.radius = 55 + Math.random() * 60;
-    // 通常の鶏はさらに遅く
-    chicken.userData.speed = chicken.userData.isGold ? 0.00013 + Math.random() * 0.00007 : 0.00015 + Math.random() * 0.00009;
-    chicken.userData.height = 38 + Math.random() * 20;
-  }
-  const now = performance.now();
-  chicken.position.x = chicken.userData.basePos.x + Math.cos(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
-  chicken.position.z = chicken.userData.basePos.z + Math.sin(now * chicken.userData.speed + chicken.userData.phase) * chicken.userData.radius;
-  chicken.position.y = chicken.userData.height + Math.sin(now * 0.0008 + chicken.userData.phase) * 7;
-  chicken.rotation.y = Math.PI/2 - (now * chicken.userData.speed + chicken.userData.phase);
-}
+// 削除
 
 // --- 飛行機・ヘリコプター生成 ---
 const aircrafts = [];
@@ -1486,6 +1471,23 @@ window.addEventListener('DOMContentLoaded', () => {
 // public/index.html内に <audio id="bgm-audio" src="bgm.mp3"></audio> が存在し、public/bgm.mp3 ファイルも存在するか確認してください。
 // 他のAudioも同様にid, src, ファイル名の一致を確認してください。
 
+// --- BGM停止制御 ---
+function stopBGM() {
+  const bgm = document.getElementById('bgm-audio');
+  if (bgm && !bgm.paused) {
+    bgm.pause();
+    bgm.currentTime = 0;
+  }
+}
+// タブ非表示・復帰時・ページ離脱時にBGM停止
+window.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopBGM();
+});
+window.addEventListener('pagehide', stopBGM);
+window.addEventListener('beforeunload', stopBGM);
+// スマホの画面オフや切り替えにも対応
+window.addEventListener('blur', stopBGM);
+
 // --- ミサイル発射処理 ---
 function launchLocalMissile(position, direction) {
   const missile = createMissile(position, direction);
@@ -1667,63 +1669,6 @@ for (const [mid, m] of Object.entries(allMissiles)) {
         // channel.publish('hit', { targetId: pid });
         scene.remove(m.mesh);
         delete allMissiles[mid];
-        break;
-      }
-    }
-  }
-  if (m.life > 60) {
-    scene.remove(m.mesh);
-    delete allMissiles[mid];
-  }
-}
-
-// --- 他プレイヤーの体力が0になった時にランダムな場所へリスポーンし、消滅時に花火エフェクトを表示するように修正。handlePeerHit関数を追加し、オンライン同期ミサイルの処理部分で他プレイヤー撃墜時に呼び出すようにした。 ---
-function handlePeerHit(peerId, attackerId) {
-  const peer = peers[peerId];
-  if (!peer || !peer.group) return;
-  peer.hp = (typeof peer.hp === 'number' ? peer.hp : 5) - 1;
-  updateHeartDisplay(peer, peer.hp);
-  // ヒットエフェクトは省略可
-  if (peer.hp <= 0) {
-    // 消滅エフェクト（花火）
-    spawnFireworkEffect(peer.group.position);
-    peer.group.visible = false;
-    setTimeout(() => {
-      // ランダムリスポーン
-      let x, y, z, tries = 0;
-      do {
-        x = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
-        z = (Math.random() - 0.5) * (TERRAIN_SIZE - 40);
-        y = getTerrainHeight(x, z) + 7 + Math.random() * 6;
-        tries++;
-      } while (tries < 10 && checkCollision(new THREE.Vector3(x, y, z), 2).collided);
-      peer.group.position.set(x, y, z);
-      peer.hp = 5;
-      updateHeartDisplay(peer, peer.hp);
-      peer.group.visible = true;
-    }, 1800);
-  }
-}
-
-// --- オンライン同期ミサイルの移動 ---
-for (const [mid, m] of Object.entries(allMissiles)) {
-  m.mesh.position.addScaledVector(m.dir, 1.5);
-  m.life++;
-  if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 2.4 && hp > 0) {
-    // channel.publish('hit', { targetId: myId });
-    scene.remove(m.mesh);
-    delete allMissiles[mid];
-    handlePlayerHit(myId); // 自分が撃墜された時の処理を呼び出す
-    continue;
-  }
-  if (m.ownerId === myId) {
-    for (const pid in peers) {
-      const peer = peers[pid];
-      if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 2.4) {
-        // channel.publish('hit', { targetId: pid });
-        scene.remove(m.mesh);
-        delete allMissiles[mid];
-        handlePeerHit(pid, myId); // 他プレイヤー撃墜処理
         break;
       }
     }
