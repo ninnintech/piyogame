@@ -1601,6 +1601,7 @@ async function setupRealtimeConnection() {
     const updatePresenceInfo = async () => {
         try {
             const members = await channel.presence.get();
+            console.log("[DEBUG] presence.get result:", members, "typeof:", typeof members, "channel:", channel, "ably.connection.state:", ably && ably.connection ? ably.connection.state : undefined);
             if (!Array.isArray(members)) {
                 console.error("Presence情報の取得エラー: membersが配列ではありません", members);
                 userCount = 0;
@@ -1996,7 +1997,7 @@ function startBGM() {
             bgm.play().then(() => {
                  document.removeEventListener('click', playBGM);
                  document.removeEventListener('touchstart', playBGM);
-            }).catch(e => {});
+            }).catch(()=>{}); // エラーは無視
         };
         document.addEventListener('click', playBGM);
         document.addEventListener('touchstart', playBGM);
