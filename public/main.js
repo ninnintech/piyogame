@@ -1888,6 +1888,8 @@ function setupInput() {
     // キーボード入力
     window.addEventListener('keydown', (e) => {
         switch (e.code) {
+            case 'KeyW': case 'ArrowUp': move.forward = 1; break;
+            case 'KeyS': case 'ArrowDown': move.forward = -1; break;
             case 'KeyA': case 'ArrowLeft': move.turn = -1; break;
             case 'KeyD': case 'ArrowRight': move.turn = 1; break;
             case 'Space': move.up = 1; break;
@@ -1898,6 +1900,8 @@ function setupInput() {
     });
     window.addEventListener('keyup', (e) => {
         switch (e.code) {
+            case 'KeyW': case 'ArrowUp': if (move.forward === 1) move.forward = 0; break;
+            case 'KeyS': case 'ArrowDown': if (move.forward === -1) move.forward = 0; break;
             case 'KeyA': case 'ArrowLeft': if (move.turn === -1) move.turn = 0; break;
             case 'KeyD': case 'ArrowRight': if (move.turn === 1) move.turn = 0; break;
             case 'Space': if (move.up === 1) move.up = 0; break;
@@ -1921,15 +1925,15 @@ function setupInput() {
                 const force = data.force;
                 // y: 前後進 (-1:後, 1:前) -> forceで強度調整
                 // x: 左右旋回 (-1:左, 1:右)
+                move.forward = Math.sin(angle) * force * 1.5; // 前後進の感度調整
                 move.turn = Math.cos(angle) * force * 1.5;    // 旋回の感度調整
-                move.up = Math.sin(angle) * force * 1.5; // 上昇/下降の感度調整
-                move.turn = Math.max(-1, Math.min(1, move.turn)); // -1から1の範囲に制限
-                move.up = Math.max(-1, Math.min(1, move.up));
+                move.forward = Math.max(-1, Math.min(1, move.forward));
+                move.turn = Math.max(-1, Math.min(1, move.turn));
             }
         });
         joystick.on('end', () => {
+            move.forward = 0;
             move.turn = 0;
-            move.up = 0;
         });
     } else if (!joystickZone) {
         console.warn("要素 #joystick-zone が見つかりません。");
@@ -2172,8 +2176,12 @@ function updatePlayerMovement(deltaTime) {
     // 旋回 (deltaTimeを考慮)
     bird.rotation.y -= move.turn * turnRate * deltaTime;
 
+    // 前後進 (ワールド方向ベクトルを取得)
+    const moveDirection = bird.getWorldDirection(new THREE.Vector3());
+    const deltaPosition = moveDirection.multiplyScalar(move.forward * currentSpeed * deltaTime);
+
     // 上昇/下降
-    const deltaPosition = new THREE.Vector3(0, move.up * upDownSpeed * deltaTime, 0);
+    deltaPosition.y += move.up * upDownSpeed * deltaTime;
 
     // 現在位置に加算
     const nextPosition = bird.position.clone().add(deltaPosition);
