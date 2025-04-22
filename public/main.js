@@ -1840,7 +1840,9 @@ function showLogin() {
 // --- イベントリスナー ---
 window.addEventListener('DOMContentLoaded', () => {
     try {
+        initGraphics();
         showLogin();
+        // 必要に応じて他の初期化（例: BGM再生の準備など）
     } catch (e) {
         console.error("ログイン画面の初期化エラー:", e);
     }
@@ -2144,3 +2146,8 @@ function renderScene() {
 }
 
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+    initGraphics();
+    showLogin();
+});
