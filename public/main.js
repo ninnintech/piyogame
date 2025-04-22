@@ -53,7 +53,6 @@ const allMissiles = {}; // 同期用ミサイル { id: { mesh, ownerId, dir, lif
 let infoDiv, rankingDiv, dashGaugeElement;
 
 // --- 初期化処理 ---
-
 function initGraphics() {
   canvas = document.getElementById('game-canvas');
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -137,7 +136,6 @@ function getTerrainHeight(x, z) {
 
 
 // --- オブジェクト生成 ---
-
 function placeObjects() {
   // ビル
   for (let i = 0; i < 22; i++) {
@@ -1782,6 +1780,7 @@ function removePeer(peerId) {
 }
 
 }
+
 function sendState() {
     if (!channel || !bird || hp <= 0) return; // 送信条件
 
@@ -2145,11 +2144,73 @@ function renderScene() {
     renderer.render(scene, camera)
 }
 
+function startGame() {
+    // ログイン画面を非表示
+    const loginModal = document.getElementById('login-modal');
+    if (loginModal) loginModal.style.display = 'none';
+
+    // ゲームキャンバスを表示
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) canvas.style.display = 'block';
+
+    // 必要な初期化処理（例：Ably接続、BGM再生など）
+    if (!ably) {
+        myId = myId || `Guest_${Math.random().toString(36).slice(2, 7)}`;
+        ably = initAbly(myId);
+    }
+    if (ably && typeof setupRealtimeConnection === 'function') {
+        setupRealtimeConnection();
+    }
+    // BGM再生例
+    const bgm = document.getElementById('bgm');
+    if (bgm && bgm.paused) {
+        bgm.play().catch(()=>{});
+    }
+}
+window.startGame = startGame;
+
 window.addEventListener('DOMContentLoaded', () => {
     try {
         initGraphics();
         showLogin();
+        // 必要に応じて他の初期化（例：BGM再生の準備など）
     } catch (e) {
-        console.error('初期化エラー:', e);
+        console.error("ログイン画面の初期化エラー:", e);
     }
+});
+
+window.addEventListener('resize', () => {
+    if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+});
+
+// スマホでの中断/再開処理
+document.addEventListener('visibilitychange', () => {
+    const bgm = document.getElementById('bgm-audio');
+    if (document.hidden) {
+        // バックグラウンドになった時
+        if (channel) channel.presence.leave(); // 一時離脱
+        if (ably && ably.connection.state === 'connected') {
+             // ably.connection.close(); // 完全切断せず、離脱だけが良いかも
+        }
+        if (bgm && !bgm.paused) bgm.pause();
+    } else {
+        // フォアグラウンドに戻った時
+        if (ably && ably.connection.state !== 'connected') {
+             // 再接続処理が必要な場合
+             // setupRealtimeConnection(); // 再初期化 or
+             // ably.connection.connect();
+        }
+         if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp }); // 再入室
+        if (bgm && bgm.paused) bgm.play().catch(()=>{}); // BGM再開
+    }
+});
+
+// ページを閉じる/移動する前の処理
+window.addEventListener('beforeunload', () => {
+    if (channel) channel.presence.leave(); // 必ず離脱
+    if (ably) ably.close(); // Ably接続を閉じる
 });
