@@ -1034,7 +1034,7 @@ async function setupRealtimeConnection() {
   });
   
   // --- Ably Presence: join and count active users ---
-  channel.presence.enter({ name: myName, color: myColor });
+  channel.presence.enter({ id: myId, name: myName, color: myColor });
 
   // Listen for presence updates
   function updateActiveUserCount() {
@@ -1132,10 +1132,9 @@ function showLogin() {
 window.addEventListener('DOMContentLoaded', showLogin);
 
 // --- ゲーム開始 ---
-let ws;
-const peers = {};
-
 function startGame() {
+  // 一意なIDを最初に生成
+  myId = Math.random().toString(36).substr(2, 9);
   // 鳥の色を反映
   setBirdColor(bird, myColor);
   createNameObj(bird, myName);
@@ -1152,6 +1151,24 @@ function startGame() {
   } catch (e) {
     if (typeof animate === 'function') animate();
   }
+}
+
+// --- ゲーム開始時にコインと鶏を必ず出現させる関数 ---
+function spawnGameObjects() {
+  // コイン・鶏を初期化し出現させる
+  // 既存オブジェクトを消去
+  for (const c of coins) scene.remove(c);
+  coins.length = 0;
+  for (const c of chickens) scene.remove(c);
+  chickens.length = 0;
+  // コイン
+  if (typeof spawnCoinsAtSky === 'function') {
+    spawnCoinsAtSky(16);
+  } else if (typeof spawnCoin === 'function') {
+    for (let i = 0; i < 16; i++) spawnCoin();
+  }
+  // 鶏
+  if (typeof spawnChickens === 'function') spawnChickens();
 }
 
 // --- サーバーからのイベント受信 ---
@@ -1207,8 +1224,8 @@ function startGame() {
 //   } else if (msg.type === 'respawn') {
 //     bird.position.set(msg.x, msg.y, msg.z);
 //     hp = maxHP;
-//     updateInfo();
-//     updateHeartDisplay(bird, hp);
+//       updateInfo();
+//       updateHeartDisplay(bird, hp);
 //   } else if (msg.type === 'leave') {
 //     if (peers[msg.id]) {
 //       scene.remove(peers[msg.id].group);
@@ -1359,10 +1376,11 @@ window.addEventListener('DOMContentLoaded', () => {
   rankingDiv.style.top = '10px';
   rankingDiv.style.right = '10px';
   rankingDiv.style.background = 'rgba(255,255,255,0.85)';
+  rankingDiv.style.color = '#333';
   rankingDiv.style.padding = '8px 16px';
-  rankingDiv.style.borderRadius = '8px';
-  rankingDiv.style.fontSize = '16px';
   rankingDiv.style.zIndex = 1000;
+  rankingDiv.style.fontSize = '16px';
+  rankingDiv.style.borderRadius = '8px';
   rankingDiv.style.minWidth = '180px';
   rankingDiv.innerHTML = '<b>ランキング</b><br>---';
   document.body.appendChild(rankingDiv);
@@ -1543,6 +1561,10 @@ if (channel) {
       peers[msg.data.id].hp = msg.data.hp;
       peers[msg.data.id].score = msg.data.score;
       updateHeartDisplay(peers[msg.data.id], peers[msg.data.id].hp);
+      // HPが1以上なら必ず再表示
+      if (peers[msg.data.id].hp > 0) {
+        peers[msg.data.id].group.visible = true;
+      }
     }
   });
 }
@@ -1638,6 +1660,8 @@ function handlePlayerHit(targetId) {
         hp = maxHP;
         updateInfo();
         updateHeartDisplay(bird, hp);
+        // 自分の復活を他プレイヤーに通知（state送信）
+        if (typeof sendState === 'function') sendState();
       }
     }
   } else if (peers[targetId]) {
@@ -1648,6 +1672,10 @@ function handlePlayerHit(targetId) {
       if (peer.hp <= 0) {
         peer.group.visible = false;
       }
+    }
+    // HPが1以上に回復した場合は必ず再表示
+    if (peer.hp > 0) {
+      peer.group.visible = true;
     }
   }
 }
