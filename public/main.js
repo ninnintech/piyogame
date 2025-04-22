@@ -1711,6 +1711,26 @@ function checkChickenHitByMissile(missile) {
   }
 }
 
+// --- プレイヤーが攻撃を受けた時の処理 ---
+function handlePlayerHit(id) {
+  if (id === myId) {
+    hp = Math.max(0, hp - 1);
+    updateInfo();
+    updateHeartDisplay(bird, hp);
+    playHitSound && playHitSound();
+    if (hp === 0) {
+      // 撃墜時の処理（リスポーンやエフェクトなど必要に応じて追加）
+      playMetuSound && playMetuSound();
+    }
+  } else if (peers[id]) {
+    peers[id].hp = Math.max(0, (peers[id].hp || 1) - 1);
+    updateHeartDisplay(peers[id], peers[id].hp);
+    if (peers[id].hp === 0) {
+      playMetuSound && playMetuSound();
+    }
+  }
+}
+
 // --- NPC（空を飛ぶ鳥・虫） ---
 function spawnNPC() {
   const t = NPC_TYPES[Math.random() < 0.5 ? 0 : 1];
