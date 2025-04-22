@@ -454,8 +454,12 @@ function checkAllChickenHits() {
         spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
         playBakuhaSound(); // 爆発音再生
         scene.remove(chicken); // 鶏を一度消す
-        respawnChicken(chicken); // ランダム位置に再配置
-        scene.add(chicken); // 再度フィールドに追加
+        chickens.splice(i, 1); // 配列からも削除
+        setTimeout(() => {
+          respawnChicken(chicken); // ランダム位置に再配置
+          chickens.push(chicken); // 配列に再追加
+          scene.add(chicken); // 再度フィールドに追加
+        }, 1200); // エフェクト後に再出現
         // ミサイル消去
         scene.remove(missile.mesh);
         missile.life = 0;
@@ -1182,6 +1186,7 @@ function startGame() {
 //       score = msg.score;
 //       updateInfo();
 //       updateHeartDisplay(bird, hp);
+//       playHitSound && playHitSound();
 //     } else if (peers[msg.id]) {
 //       peers[msg.id].hp = msg.hp;
 //       peers[msg.id].score = msg.score;
@@ -1190,8 +1195,8 @@ function startGame() {
 //   } else if (msg.type === 'respawn') {
 //     bird.position.set(msg.x, msg.y, msg.z);
 //     hp = maxHP;
-//     updateInfo();
-//     updateHeartDisplay(bird, hp);
+//       updateInfo();
+//       updateHeartDisplay(bird, hp);
 //   } else if (msg.type === 'leave') {
 //     if (peers[msg.id]) {
 //       scene.remove(peers[msg.id].group);
@@ -1225,7 +1230,7 @@ window.addEventListener('DOMContentLoaded', () => {
   joystick.on('move', (evt, data) => {
     if (data && data.vector) {
       // x: -1(左)～1(右) → 左右旋回
-      // y: -1(上)～1(下) → 前進/後退
+//       // y: -1(上)～1(下) → 前進/後退
       move.turn = data.vector.x;
       move.forward = data.vector.y; // 前進:前に倒す(+1), 後退:後ろに倒す(-1)
     }
@@ -1559,19 +1564,27 @@ function updatePeerVisibility() {
   }
 }
 
-// --- プレイヤーがミサイルでヒットしたか判定し、必要に応じて処理を行う ---
-function checkPlayerHitByMissile() {
-  // ローカルミサイルが自分自身に当たったか判定（多重処理防止のためhp>0のみ）
-  if (typeof hp !== 'number' || hp <= 0) return;
-  for (let i = missiles.length - 1; i >= 0; i--) {
-    const m = missiles[i];
-    if (m.mesh.position.distanceTo(bird.position) < 2.4) {
-      // サーバーにヒット通知
-      if (channel) channel.publish('hit', { targetId: myId });
-      scene.remove(m.mesh);
-      missiles.splice(i, 1);
-      handlePlayerHit(myId); // 自分が撃墜された時の処理
-      break;
+// --- プレイヤーが攻撃を受けた時の処理 ---
+function handlePlayerHit(id) {
+  if (id === myId) {
+    hp = Math.max(0, hp - 1);
+    updateInfo();
+    updateHeartDisplay(bird, hp);
+    playHitSound();
+    if (hp === 0) {
+      // 撃墜時の処理（リスポーンやエフェクトなど必要に応じて追加）
+      playMetuSound && playMetuSound();
+      bird.visible = false;
+      setTimeout(() => {
+        respawnPlayerRandom();
+        bird.visible = true;
+      }, 1800);
+    }
+  } else if (peers[id]) {
+    peers[id].hp = Math.max(0, (peers[id].hp || 1) - 1);
+    updateHeartDisplay(peers[id], peers[id].hp);
+    if (peers[id].hp === 0) {
+      playMetuSound && playMetuSound();
     }
   }
 }
@@ -1672,11 +1685,13 @@ function checkCoinCollision() {
     const distance = bird.position.distanceTo(c.position);
     console.log(`Player at ${bird.position.toArray()} | Coin at ${c.position.toArray()} | Distance: ${distance}`);
     if (distance < 3.2) {
-      coins.splice(i, 1);
-      scene.remove(c);
       score++;
       updateInfo();
       playCoinSound && playCoinSound();
+      // スコア更新を全員に通知
+      if (channel) channel.publish('hp_score', { id: myId, hp, score });
+      coins.splice(i, 1);
+      scene.remove(c);
       spawnCoin(); // 新たなコインを即出現
     }
   }
@@ -1699,10 +1714,14 @@ function checkChickenHitByMissile(missile) {
       score++;
       updateInfo();
       spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
-      playBakuhaSound(); // 爆発音再生
+      playBakuhaSound();
       scene.remove(chicken); // 鶏を一度消す
-      respawnChicken(chicken); // ランダム位置に再配置
-      scene.add(chicken); // 再度フィールドに追加
+      chickens.splice(i, 1); // 配列からも削除
+      setTimeout(() => {
+        respawnChicken(chicken); // ランダム位置に再配置
+        chickens.push(chicken); // 配列に再追加
+        scene.add(chicken); // 再度フィールドに追加
+      }, 1200); // エフェクト後に再出現
       // ミサイル消去
       scene.remove(missile.mesh);
       missile.life = 0;
@@ -1711,22 +1730,19 @@ function checkChickenHitByMissile(missile) {
   }
 }
 
-// --- プレイヤーが攻撃を受けた時の処理 ---
-function handlePlayerHit(id) {
-  if (id === myId) {
-    hp = Math.max(0, hp - 1);
-    updateInfo();
-    updateHeartDisplay(bird, hp);
-    playHitSound && playHitSound();
-    if (hp === 0) {
-      // 撃墜時の処理（リスポーンやエフェクトなど必要に応じて追加）
-      playMetuSound && playMetuSound();
-    }
-  } else if (peers[id]) {
-    peers[id].hp = Math.max(0, (peers[id].hp || 1) - 1);
-    updateHeartDisplay(peers[id], peers[id].hp);
-    if (peers[id].hp === 0) {
-      playMetuSound && playMetuSound();
+// --- プレイヤーがミサイルでヒットしたか判定し、必要に応じて処理を行う ---
+function checkPlayerHitByMissile() {
+  // ローカルミサイルが自分自身に当たったか判定（多重処理防止のためhp>0のみ）
+  if (typeof hp !== 'number' || hp <= 0) return;
+  for (let i = missiles.length - 1; i >= 0; i--) {
+    const m = missiles[i];
+    if (m.mesh.position.distanceTo(bird.position) < 2.4) {
+      // サーバーにヒット通知
+      if (channel) channel.publish('hit', { targetId: myId });
+      scene.remove(m.mesh);
+      missiles.splice(i, 1);
+      handlePlayerHit(myId); // 自分が撃墜された時の処理
+      break;
     }
   }
 }
@@ -2058,4 +2074,14 @@ function spawnGameObjects() {
   spawnCoinsAtSky(16);
   // 鶏
   spawnChickens();
+}
+
+// --- ヒット音再生 ---
+function playHitSound() {
+  const hitAudio = document.getElementById('hit-audio');
+  if (hitAudio) {
+    hitAudio.currentTime = 0;
+    hitAudio.volume = 0.8;
+    hitAudio.play().catch(()=>{});
+  }
 }
