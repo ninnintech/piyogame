@@ -2090,10 +2090,8 @@ function showLogin() {
 
     loginModal.style.display = 'flex';
 
-    loginBtn.replaceWith(loginBtn.cloneNode(true));
-    const freshLoginBtn = document.getElementById('login-btn');
-
-    loginBtn.onclick = () => {
+    loginBtn.onclick = null; // 既存リスナーを削除
+    loginBtn.addEventListener('click', () => {
         const name = nameInput.value.trim();
         const color = colorInput.value;
         if (!name) {
@@ -2108,7 +2106,7 @@ function showLogin() {
         myColor = color;
         loginModal.style.display = 'none';
         startGame(); // ゲーム開始
-    };
+    });
 }
 
 // --- イベントリスナー ---
