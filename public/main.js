@@ -1605,59 +1605,110 @@ async function setupRealtimeConnection() {
         });
     });
 
-    // 在室メンバー取得とUI更新
-    async function updatePresenceInfo() {
-        try {
-            const members = await channel.presence.get();
-            if (!Array.isArray(members)) {
-                console.error("Presence情報取得エラー: membersが配列ではありません", members);
-                userCount = 0;
-                updateInfo();
-                return;
-            }
-            userCount = members.length;
-            updateInfo();
+// 在室メンバー取得とUI更新
+async function updatePresenceInfo() {
+    // ★★★ デバッグログ: 関数開始時の状態確認 ★★★
+    console.log(`updatePresenceInfo called. Ably state: ${ably?.connection?.state}, Channel state: ${channel?.state}`);
 
-            const currentPeerIds = new Set(Object.keys(peers));
-            for (const member of members) {
-                if (member.clientId === ably.auth.clientId) continue;
-                const state = member.data;
-                if (!state || !state.id || state.id === myId) continue;
-
-                if (!peers[state.id]) {
-                    console.log(`新規ピア参加: ${state.name}(${state.id})`);
-                    peers[state.id] = createPeerBird(state);
-                    if (peers[state.id] && peers[state.id].group) {
-                        scene.add(peers[state.id].group);
-                    } else {
-                        console.warn(`ピア ${state.id} のgroup生成に失敗しました。`);
-                    }
-                } else {
-                    const peer = peers[state.id];
-                    setBirdColor(peer.group, state.color || '#ffffff');
-                    peer.name = state.name || '???';
-                    peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
-                    peer.score = typeof state.score === 'number' ? state.score : 0;
-                    if (peer.nameObj) {
-                        peer.nameObj.nameSpan.textContent = peer.name;
-                        updateHeartDisplay(peer.nameObj, peer.hp);
-                    }
-                    if (peer.group) peer.group.visible = peer.hp > 0;
-                }
-                currentPeerIds.delete(state.id);
-            }
-
-            // Presenceにいなくなったピアを削除
-            for (const oldPeerId of currentPeerIds) {
-                console.log(`ピア退出: ${peers[oldPeerId]?.name || oldPeerId}`);
-                removePeer(oldPeerId);
-            }
-            updateRanking();
-
-        } catch (err) {
-            console.error("Presence情報の取得/更新エラー:", err);
-        }
+    // ★★★ Ablyクライアントとチャンネルの状態チェック ★★★
+    if (!ably || ably.connection.state !== 'connected') {
+        console.warn(`Cannot get presence info: Ably client not connected (state: ${ably?.connection?.state}). Skipping update.`);
+        // UI表示などでユーザーに状態を伝えることも検討
+        return; // Ablyが接続されていなければ中断
     }
+    if (!channel || channel.state !== 'attached') {
+         console.warn(`Cannot get presence info: Channel not attached (state: ${channel?.state}). Skipping update.`);
+        // 必要であれば channel.attach() を試みるか、待機する
+        // 例: channel.attach((err) => { if (!err) console.log('Channel attached'); });
+        return; // チャンネルがアタッチされていなければ中断
+    }
+
+    try {
+        // ★★★ デバッグログ: API呼び出し直前 ★★★
+        console.log(`Attempting to call channel.presence.get() for channel: ${channel.name}`);
+
+        const members = await channel.presence.get();
+
+        // ★★★ デバッグログ: API呼び出し直後と結果の型チェック ★★★
+        console.log('channel.presence.get() returned:', members, `(Type: ${typeof members})`);
+
+        // ★★★ undefined および配列でない場合のチェック ★★★
+        if (typeof members === 'undefined') {
+             // このケースは Ably SDK の予期せぬ挙動の可能性が高い
+             console.error("Presence情報取得エラー: channel.presence.get() returned undefined. Ably SDK or connection issue suspected.");
+             // リトライするか、エラーとして扱うか検討
+             // 一時的な問題かもしれないので、数回リトライするロジックを入れるのも手
+             userCount = 0; // 不明な状態なのでリセット
+             updateInfo();
+             return;
+        }
+        if (!Array.isArray(members)) {
+            // 本来エラーになるはずだが、念のためチェック
+            console.error("Presence情報取得エラー: membersが配列ではありません。Received:", members);
+            userCount = 0; // 不明な状態なのでリセット
+            updateInfo();
+            return;
+        }
+
+        // --- 正常系 ---
+        userCount = members.length;
+        updateInfo();
+
+        const currentPeerIds = new Set(Object.keys(peers));
+        for (const member of members) {
+            // 自分の clientId と Ably が内部的に使う clientId は異なることがあるので注意
+            // member.connectionId === ably.connection.id で比較する方がより確実な場合もある
+            if (member.clientId === ably.auth.clientId) continue; // 自分のクライアントIDは無視
+            const state = member.data;
+            if (!state || !state.id || state.id === myId) continue; // state, id の存在チェックと自分のIDを除外
+
+            if (!peers[state.id]) {
+                console.log(`新規ピア参加: ${state.name}(${state.id})`);
+                peers[state.id] = createPeerBird(state);
+                if (peers[state.id] && peers[state.id].group) {
+                    scene.add(peers[state.id].group);
+                } else {
+                    console.warn(`ピア ${state.id} のgroup生成に失敗、または group が null/undefined です。`);
+                }
+            } else {
+                // 既存ピアの更新ロジック... (変更なし)
+                const peer = peers[state.id];
+                // group が存在するかチェックしてから操作
+                if (peer.group) {
+                     setBirdColor(peer.group, state.color || '#ffffff');
+                     peer.group.visible = peer.hp > 0;
+                } else {
+                     console.warn(`ピア ${state.id} の group が見つかりません。更新をスキップします。`);
+                }
+                peer.name = state.name || '???';
+                peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
+                peer.score = typeof state.score === 'number' ? state.score : 0;
+                if (peer.nameObj) {
+                    peer.nameObj.nameSpan.textContent = peer.name;
+                    updateHeartDisplay(peer.nameObj, peer.hp);
+                }
+            }
+            currentPeerIds.delete(state.id);
+        }
+
+        // Presenceにいなくなったピアを削除
+        for (const oldPeerId of currentPeerIds) {
+            console.log(`ピア退出: ${peers[oldPeerId]?.name || oldPeerId}`);
+            removePeer(oldPeerId);
+        }
+        updateRanking();
+
+    } catch (err) {
+        // ★★★ catch ブロックでのエラーハンドリング強化 ★★★
+        console.error("Presence情報の取得/更新中に例外発生:", err);
+        if (err instanceof Error) { // AblyErrorか通常のErrorか判定
+             console.error(`Error details: name=${err.name}, message=${err.message}, code=${err.code || 'N/A'}, statusCode=${err.statusCode || 'N/A'}`);
+        } else {
+             console.error("Caught non-Error object:", err);
+        }
+        // エラー内容に応じてUI表示やリトライ処理を検討
+    }
+} // updatePresenceInfo 関数の終わり
 
     // 定期的に Presence 情報で同期
     setInterval(updatePresenceInfo, 5000);
