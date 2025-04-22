@@ -1917,3 +1917,105 @@ function playHitSound() {
     hitAudio.play().catch(()=>{});
   }
 }
+
+// --- 大きなハート回復アイテム管理 ---
+const BIG_HEART_COUNT = 2;
+let bigHearts = [];
+
+function createBigHeartMesh() {
+  const group = new THREE.Group();
+  // Heart shape (2 spheres + cone)
+  const mat = new THREE.MeshLambertMaterial({ color: 0xff1744, emissive: 0xff1744, emissiveIntensity: 0.6 });
+  const left = new THREE.Mesh(new THREE.SphereGeometry(0.6, 20, 20), mat);
+  left.position.set(-0.4, 0.6, 0);
+  const right = new THREE.Mesh(new THREE.SphereGeometry(0.6, 20, 20), mat);
+  right.position.set(0.4, 0.6, 0);
+  const bottom = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.2, 24), mat);
+  bottom.position.set(0, -0.15, 0);
+  bottom.rotation.x = Math.PI;
+  group.add(left); group.add(right); group.add(bottom);
+  group.castShadow = true;
+  group.receiveShadow = true;
+  // Add a glow effect
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(1.1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xff8fa3, transparent: true, opacity: 0.28 }));
+  group.add(glow);
+  return group;
+}
+
+function randomBigHeartPosition() {
+  let tries = 0, x, z, y;
+  do {
+    // 安全な範囲でリスポーン（中心±TERRAIN_SIZE*0.45、地形の高さ8-35の範囲）
+    x = (Math.random() - 0.5) * TERRAIN_SIZE * 0.9;
+    z = (Math.random() - 0.5) * TERRAIN_SIZE * 0.9;
+    y = getTerrainHeight(x, z);
+    tries++;
+  } while ((y < 8 || y > 35) && tries < 10);
+  return new THREE.Vector3(x, y + 3.5, z); // 少し浮かせる
+}
+
+function spawnBigHearts() {
+  // Remove existing
+  for (const h of bigHearts) scene.remove(h.mesh);
+  bigHearts = [];
+  for (let i = 0; i < BIG_HEART_COUNT; i++) {
+    const mesh = createBigHeartMesh();
+    const pos = randomBigHeartPosition();
+    mesh.position.copy(pos);
+    mesh.userData = { type: 'bigHeart' };
+    scene.add(mesh);
+    bigHearts.push({ mesh });
+  }
+}
+
+function respawnBigHeart(index) {
+  const mesh = bigHearts[index].mesh;
+  const pos = randomBigHeartPosition();
+  mesh.position.copy(pos);
+}
+
+function checkBigHeartCollision() {
+  for (let i = 0; i < bigHearts.length; i++) {
+    const heart = bigHearts[i];
+    if (!heart.mesh.visible) continue;
+    // Check distance to player
+    if (bird.position.distanceTo(heart.mesh.position) < 2.1 && hp < maxHP) {
+      hp = maxHP;
+      updateInfo();
+      updateHeartDisplay(bird, hp);
+      // Optionally play a sound
+      const audio = document.getElementById('coin-audio');
+      if (audio) { audio.currentTime = 0; audio.play().catch(()=>{}); }
+      respawnBigHeart(i);
+      // Optionally, notify others (multiplayer sync)
+    }
+  }
+}
+
+// --- ゲーム開始時に大ハートも生成 ---
+const origStartGame = startGame;
+startGame = function() {
+  origStartGame();
+  spawnBigHearts();
+};
+
+// --- 毎フレーム：大ハートの当たり判定 ---
+const origAnimate = animate;
+animate = function() {
+  checkBigHeartCollision();
+  if (typeof origAnimate === 'function') origAnimate();
+};
+
+// --- ピア（他プレイヤー）のHPラベルは常に表示（HP0でも消さない） ---
+function updateNameObjPosition(peer) {
+  var pos = peer.group.position.clone();
+  pos.y += 2.2;
+  pos.project(camera);
+  var x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+  var y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+  peer.nameObj.element.style.left = (x - 32) + "px";
+  peer.nameObj.element.style.top = (y - 18) + "px";
+  updateHeartDisplay(peer, peer.hp);
+  // HP0でもラベルは非表示にしない
+  peer.nameObj.element.style.display = '';
+}
