@@ -1225,15 +1225,33 @@ window.addEventListener('DOMContentLoaded', () => {
   joystick.on('move', (evt, data) => {
     if (data && data.vector) {
       // x: -1(左)～1(右) → 左右旋回
-      // y: -1(上)～1(下) → 上昇/下降
+      // y: -1(上)～1(下) → 前進/後退
       move.turn = data.vector.x;
-      move.up = -data.vector.y;
+      move.forward = -data.vector.y; // 前進:前に倒す(+1), 後退:後ろに倒す(-1)
     }
   });
   joystick.on('end', () => {
     move.turn = 0;
-    move.up = 0;
+    move.forward = 0;
   });
+
+  // 上昇・下降ボタン
+  const upBtn = document.getElementById('up-btn');
+  const downBtn = document.getElementById('down-btn');
+  if (upBtn) {
+    upBtn.addEventListener('touchstart', () => move.up = 1);
+    upBtn.addEventListener('touchend', () => move.up = 0);
+    upBtn.addEventListener('mousedown', () => move.up = 1);
+    upBtn.addEventListener('mouseup', () => move.up = 0);
+    upBtn.addEventListener('mouseleave', () => move.up = 0);
+  }
+  if (downBtn) {
+    downBtn.addEventListener('touchstart', () => move.up = -1);
+    downBtn.addEventListener('touchend', () => move.up = 0);
+    downBtn.addEventListener('mousedown', () => move.up = -1);
+    downBtn.addEventListener('mouseup', () => move.up = 0);
+    downBtn.addEventListener('mouseleave', () => move.up = 0);
+  }
 
   // 新しいボタン構成に対応
   const fbtn = document.getElementById('forward-btn');
