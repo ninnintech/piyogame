@@ -1033,6 +1033,24 @@ async function setupRealtimeConnection() {
     launchOnlineMissile(m.id, pos, dir);
   });
   
+  // --- Ably Presence: join and count active users ---
+  channel.presence.enter({ name: myName, color: myColor });
+
+  // Listen for presence updates
+  function updateActiveUserCount() {
+    channel.presence.get((err, members) => {
+      if (!err && members) {
+        userCount = members.length;
+        updateInfo();
+      }
+    });
+  }
+  channel.presence.subscribe('enter', updateActiveUserCount);
+  channel.presence.subscribe('leave', updateActiveUserCount);
+  channel.presence.subscribe('update', updateActiveUserCount);
+  // Initial count
+  updateActiveUserCount();
+
   // ユーザーID生成
   myId = Math.random().toString(36).substr(2, 9);
 }
@@ -1442,7 +1460,7 @@ function launchLocalMissile(position, direction) {
   // ミサイルが一定時間後に消えるようにタイマー設定
   setTimeout(() => {
     scene.remove(missile.mesh);
-    delete allMissiles[missileId];
+    delete allMissiles[missileId]; // 完全削除
   }, 3000);
   
   return missile;
@@ -1465,7 +1483,7 @@ function launchOnlineMissile(ownerId, position, direction) {
   // ミサイルが一定時間後に消えるようにタイマー設定
   setTimeout(() => {
     scene.remove(missile.mesh);
-    delete allMissiles[missileId];
+    delete allMissiles[missileId]; // 完全削除
   }, 3000);
 }
 

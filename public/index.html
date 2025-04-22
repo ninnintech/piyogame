@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
   <title>3D箱庭バードガーデン</title>
   <style>
     body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; }
@@ -110,6 +110,27 @@
     window.ABLY_KEY = "${ABLY_KEY}";
   </script>
   <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+  <script>
+    // Prevent double-tap to zoom and pinch-zoom on mobile
+    document.addEventListener('DOMContentLoaded', function() {
+      let lastTouchEnd = 0;
+      document.body.addEventListener('touchend', function(event) {
+        const now = new Date().getTime();
+        if (now - lastTouchEnd <= 350) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+      document.body.addEventListener('gesturestart', function(event) {
+        event.preventDefault();
+      });
+      document.body.addEventListener('touchmove', function(event) {
+        if (event.scale !== undefined && event.scale !== 1) {
+          event.preventDefault();
+        }
+      }, { passive: false });
+    });
+  </script>
 </head>
 <body>
   <audio id="bgm-audio" src="bgm.mp3" preload="auto" loop></audio>
