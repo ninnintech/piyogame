@@ -1379,6 +1379,7 @@ function updateInfo() {
   if (infoDiv) {
     infoDiv.innerHTML = `スコア: <b>${score}</b>　体力: <b>${hp}</b> / ${maxHP}<br>アクティブユーザー: <b>${userCount}</b><br>WASD/矢印キー：移動・旋回　Space：上昇　Shift：下降`;
   }
+  console.log('[score debug] updateInfo', score);
 }
 
 // --- 右上ランキング表示用divを追加 ---
@@ -1817,9 +1818,13 @@ function handlePlayerHitRealtime(targetId, attackerId) {
   }
   if (attackerId === myId) {
     score += 10;
+    console.log('[score debug] +10, now:', score);
     updateInfo();
     playHitSound();
-    if (channel) channel.publish('hp_score', { id: myId, hp, score }); // スコア同期
+    if (channel) {
+      console.log('[score debug] publish hp_score', { id: myId, hp, score });
+      channel.publish('hp_score', { id: myId, hp, score }); // スコア同期
+    }
   }
   // スコア/HP同期（撃墜された側も）
   if (channel && targetId === myId) channel.publish('hp_score', { id: myId, hp, score });
