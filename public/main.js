@@ -1619,6 +1619,7 @@ animate();
 // --- メインゲームループ ---
 function animate() {
   try {
+    checkBigHeartCollision();
     // コイン演出
     const nowRaw = performance.now();
     const now = nowRaw * 0.002;
@@ -1930,12 +1931,6 @@ startGame = function() {
   spawnBigHearts();
 };
 
-// --- 毎フレーム：大ハートの当たり判定 ---
-const origAnimate = animate;
-animate = function() {
-  checkBigHeartCollision();
-  if (typeof origAnimate === 'function') origAnimate();
-};
 
 // --- ピア（他プレイヤー）のHPラベルは常に表示（HP0でも消さない） ---
 function updateNameObjPosition(peer) {
