@@ -1606,28 +1606,29 @@ async function setupRealtimeConnection() {
     const updatePresenceInfo = async () => {
         try {
             let members = await channel.presence.get();
-            // Ablyの仕様変更や通信エラーでnull/undefinedになる場合も考慮
-            if (!Array.isArray(members)) {
-                if (members && typeof members.items === 'function') {
-                    // Iterableな場合（Ably SDKのバージョンによってはitems()で取得）
-                    members = Array.from(members.items ? members.items() : members);
-                } else if (members && typeof members === 'object' && typeof members.length === 'number') {
-                    // 配列風オブジェクト
+            // Ablyの仕様や通信状況でundefined/null/配列/イテレータ/Map/Set/配列風など全て考慮
+            if (!members) {
+                members = [];
+            } else if (!Array.isArray(members)) {
+                if (typeof members.items === 'function') {
+                    members = Array.from(members.items());
+                } else if (typeof members.values === 'function') {
+                    members = Array.from(members.values());
+                } else if (typeof members.length === 'number') {
                     members = Array.prototype.slice.call(members);
-                } else if (members && typeof members === 'object') {
-                    // オブジェクト型（MapやSet）を考慮し、値だけ抽出
-                    members = Array.from(Object.values(members));
+                } else if (typeof members === 'object') {
+                    members = Object.values(members);
                 } else {
-                    console.error("Presence情報の取得エラー: membersが配列でもイテレータでもありません", members);
-                    userCount = 0;
-                    updateInfo();
-                    return;
+                    // どれにも該当しなければ空配列扱い
+                    members = [];
                 }
             }
             userCount = members.length;
             updateInfo();
         } catch (err) {
             console.error("Presence情報の取得/更新エラー:", err);
+            userCount = 0;
+            updateInfo();
         }
     };
 
