@@ -1227,7 +1227,7 @@ window.addEventListener('DOMContentLoaded', () => {
       // x: -1(左)～1(右) → 左右旋回
       // y: -1(上)～1(下) → 前進/後退
       move.turn = data.vector.x;
-      move.forward = -data.vector.y; // 前進:前に倒す(+1), 後退:後ろに倒す(-1)
+      move.forward = data.vector.y; // 前進:前に倒す(+1), 後退:後ろに倒す(-1)
     }
   });
   joystick.on('end', () => {
