@@ -110,8 +110,7 @@
     window.ABLY_KEY = "${ABLY_KEY}";
   </script>
   <script src="https://cdn.ably.io/lib/ably.min-1.2.30.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-  <script src="main.js"></script>
+  <script type="module" src="main.js"></script>
   <script>
     // Prevent double-tap to zoom and pinch-zoom on mobile
     document.addEventListener('DOMContentLoaded', function() {
@@ -173,6 +172,5 @@
       <button id="login-btn" type="button">ゲーム開始</button>
     </div>
   </div>
-  <!-- <script type="module" src="main.js"></script> -->
 </body>
 </html>

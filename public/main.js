@@ -1,3 +1,5 @@
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+
 // --- グローバル変数宣言 ---
 let scene, camera, renderer, canvas;
 let move = { forward: 0, turn: 0, up: 0 };
