@@ -1781,7 +1781,7 @@ function removePeer(peerId) {
     }
 }
 
-
+}
 function sendState() {
     if (!channel || !bird || hp <= 0) return; // 送信条件
 
@@ -2143,8 +2143,6 @@ function updateUIElements() {
 
 function renderScene() {
     renderer.render(scene, camera)
-}
-
 }
 
 window.addEventListener('DOMContentLoaded', () => {
