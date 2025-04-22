@@ -1575,9 +1575,18 @@ function escapeHTML(str) {
 async function initAbly() {
     try {
         const apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : '';
+        // クライアントIDをここで生成する方式ですね
         const myClientId = 'player_' + Math.random().toString(36).slice(2, 11);
         const authUrl = `${apiBase}/api/token?clientId=${encodeURIComponent(myClientId)}`;
-        return new Ably.Realtime({ authUrl, clientId: myClientId });
+
+        // ↓↓↓ ここを修正します ↓↓↓
+        return new Ably.Realtime({
+            authUrl: authUrl,        // 既存の認証URLオプション
+            clientId: myClientId,    // 既存のクライアントIDオプションの後ろにカンマを追加
+            log: { level: 3 }      // ここに log オプションを追加 (3はINFOレベル)
+        });
+        // ↑↑↑ ここまで修正 ↑↑↑
+
     } catch (error) {
         console.error('Ably初期化エラー:', error);
         alert('サーバー接続エラー: 認証トークンの取得に失敗しました。\nサーバーが動作していて、URLが正しいか確認してください。');
@@ -1610,6 +1619,27 @@ async function setupRealtimeConnection() {
 
     // 在室メンバー取得とUI更新
     const updatePresenceInfo = async () => {
+            // ▼▼▼ 接続状態チェックを追加 ▼▼▼
+    if (!ably || ably.connection.state !== 'connected') {
+        // Ably本体が接続されていない場合は処理を中断
+        console.warn(`[${new Date().toLocaleTimeString()}] updatePresenceInfo: Ably接続未確立のためスキップ (状態: ${ably?.connection?.state})`);
+        return;
+    }
+    if (!channel || channel.state !== 'attached') {
+        // チャンネルが接続(attach)されていない場合は処理を中断
+        console.warn(`[${new Date().toLocaleTimeString()}] updatePresenceInfo: チャンネル未接続のためスキップ (状態: ${channel?.state})`);
+        // 必要なら再接続を試みる (ただし、無限ループに注意)
+        // try {
+        //     console.log("チャンネル再接続を試みます...");
+        //     await channel.attach();
+        //     console.log("チャンネル再接続成功");
+        // } catch (attachErr) {
+        //     console.error("チャンネル再接続試行失敗:", attachErr);
+        //     return; // 再接続失敗時は中断
+        // }
+         return; // 一旦中断する
+    }
+    // ▲▲▲ 接続状態チェックを追加 ▲▲▲
         try {
             const members = await channel.presence.get();
             console.log("[DEBUG] presence.get result:", members, "typeof:", typeof members, "channel:", channel, "ably.connection.state:", ably && ably.connection ? ably.connection.state : undefined);
