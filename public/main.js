@@ -511,7 +511,7 @@ function placeObjects() {
         addCollisionObject(heli, 3.5); // 衝突半径調整
     }
 
-
+}
 // --- 鳥モデル生成 (共通化) ---
 function createBirdModel(color = 0xffff66) {
     const birdGroup = new THREE.Group();
@@ -2306,6 +2306,5 @@ function updateUIElements() {
 }
 
 function renderScene() {
-    renderer.render(scene, camera);
-}
+    renderer.render(scene, camera)
 }
