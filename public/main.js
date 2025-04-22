@@ -2221,16 +2221,16 @@ function initInput() {
     window.addEventListener('keyup', onKeyUp);
     // ボタン
     const btns = [
-        { id: 'btn-missile', action: () => launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3())) },
-        { id: 'btn-attack', action: () => startDash() },
-        { id: 'btn-up', action: () => move.up = 1 },
-        { id: 'btn-down', action: () => move.up = -1 }
+        { id: 'missile-btn', action: () => launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3())) },
+        { id: 'dash-btn', action: () => startDash() },
+        { id: 'up-btn', action: () => move.up = 1 },
+        { id: 'down-btn', action: () => move.up = -1 }
     ];
     btns.forEach(({id, action}) => {
         const btn = document.getElementById(id);
         if (btn) {
-            btn.ontouchstart = btn.onmousedown = action;
-            btn.ontouchend = btn.onmouseup = () => { if(id==='btn-up'||id==='btn-down') move.up = 0; };
+            btn.ontouchstart = btn.onmousedown = (e) => { e.preventDefault(); action(); };
+            btn.ontouchend = btn.onmouseup = (e) => { e.preventDefault(); if(id==='up-btn'||id==='down-btn') move.up = 0; };
         }
     });
 }
@@ -2256,9 +2256,9 @@ function onKeyUp(e) {
 // --- ジョイスティックUI ---
 function showJoystick() {
     if (!window.nipplejs) return;
-    const joystickZone = document.getElementById('joystick-zone');
-    if (!joystickZone) {
-        const zone = document.createElement('div');
+    let zone = document.getElementById('joystick-zone');
+    if (!zone) {
+        zone = document.createElement('div');
         zone.id = 'joystick-zone';
         zone.style.position = 'absolute';
         zone.style.left = '10px';
@@ -2268,23 +2268,25 @@ function showJoystick() {
         zone.style.zIndex = 10;
         document.body.appendChild(zone);
     }
+    // 既存のジョイスティックを削除してから新規作成
+    if (zone._manager && zone._manager.destroy) zone._manager.destroy();
     const manager = nipplejs.create({
-        zone: document.getElementById('joystick-zone'),
+        zone,
         mode: 'static',
         position: { left: '60px', bottom: '60px' },
         color: 'blue',
         size: 100
     });
+    zone._manager = manager;
     manager.on('move', (evt, data) => {
         if (data && data.angle && data.distance > 10) {
+            // 上方向を前進、右方向を右旋回
             const rad = data.angle.radian;
-            move.forward = Math.cos(rad);
-            move.turn = Math.sin(rad);
+            move.forward = Math.sin(rad); // 上(+y)で1
+            move.turn = Math.cos(rad);    // 右(+x)で1
         }
     });
     manager.on('end', () => {
         move.forward = 0; move.turn = 0;
     });
 }
-
-// --- BGMのaudio要素IDをbgmに統一（HTML側も要確認） ---
