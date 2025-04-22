@@ -1593,89 +1593,23 @@ async function setupRealtimeConnection() {
 
     channel = ably.channels.get('bird-garden-3d-v2'); // チャンネル名変更推奨
 
+    // Ably接続完了を待つ
+    if (ably.connection.state !== 'connected') {
+        await new Promise(resolve => {
+            ably.connection.once('connected', resolve);
+        });
+    }
+
     // --- Presence (入退室管理) ---
     await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
     console.log("Presence Enter 完了");
 
-// 在室メンバー取得とUI更新
-const updatePresenceInfo = async () => {
-    try {
-        if (!channel) {
-            console.error('Ably channel is not initialized.');
-            userCount = 0;
-            updateInfo();
-            return;
-        }
-        if (!ably || ably.connection.state !== 'connected') {
-            console.warn('Ably is not connected yet.');
-            userCount = 0;
-            updateInfo();
-            return;
-        }
-        const members = await channel.presence.get();
-        console.log('Ably presence.get() result:', members, Array.isArray(members));
-        if (!Array.isArray(members)) {
-            console.error("Presence情報取得エラー: membersが配列ではありません", members);
-            userCount = 0;
-            updateInfo();
-            return;
-        }
-        userCount = members.length;
-        updateInfo(); // 接続人数表示更新
-
-        // 既存ピアの更新と新規ピアの追加
-        const currentPeerIds = new Set(Object.keys(peers));
-        for (const member of members) {
-            if (!member || typeof member !== 'object') continue;
-            if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
-
-            const state = member.data; // Presence data を使う
-            if (!state) continue; // データがない場合はスキップ
-
-            if (!peers[state.id]) { // 新規ピア
-                console.log(`新規ピア参加: ${state.name}(${state.id})`);
-                peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
-                scene.add(peers[state.id].group);
-            } else { // 既存ピアの情報更新
-                const peer = peers[state.id];
-                peer.group.position.set(state.x || 0, state.y || 10, state.z || 0); // 位置も同期？
-                peer.group.rotation.y = state.ry || 0; // 回転も同期？
-                setBirdColor(peer.group, state.color || '#ffffff');
-                peer.name = state.name || '???';
-                peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
-                peer.score = typeof state.score === 'number' ? state.score : 0;
-                if (peer.nameObj) {
-                    peer.nameObj.nameSpan.textContent = peer.name;
-                    updateHeartDisplay(peer.nameObj, peer.hp);
-                }
-                peer.group.visible = peer.hp > 0; // HPが0なら非表示
-            }
-            currentPeerIds.delete(state.id); // 処理済みピアIDをセットから削除
-        }
-
-        // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
-        // presenceにいなくなったがpeersに残っているピアを削除
-        for (const oldPeerId of currentPeerIds) {
-            if (peers[oldPeerId]) {
-                console.log(`ピア退出: ${peers[oldPeerId].name}(${oldPeerId})`);
-                removePeer(oldPeerId);
-            }
-        }
-        updateRanking(); // ランキング更新
-
-    } catch (err) {
-        console.error("Presence情報の取得/更新エラー:", err);
-        userCount = 0;
-        updateInfo();
-    }
-};
     // 定期的に Presence 情報で同期 (例: 5秒ごと)
     setInterval(updatePresenceInfo, 5000);
     await updatePresenceInfo(); // 初回実行
 
     // Presence イベントリスナー
     channel.presence.subscribe(['enter', 'leave', 'update'], updatePresenceInfo);
-
 
     // --- メッセージ購読 ---
 
@@ -1695,7 +1629,6 @@ const updatePresenceInfo = async () => {
         // if(peer.nameObj) { /* ... */ }
         // peer.group.visible = peer.hp > 0;
     });
-
 
     // ミサイル発射同期
     channel.subscribe('fire', (msg) => {
