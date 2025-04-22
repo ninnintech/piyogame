@@ -36,6 +36,7 @@ const NPC_TYPES = [
   { type: 'bird', color: 0x99ccff, scale: 1.1 },
   { type: 'bug', color: 0x333300, scale: 0.5 }
 ];
+console.log("main.js loaded");
 import * as THREE from 'https://cdn.skypack.dev/three@0.152.2';
 
 const canvas = document.getElementById('game-canvas');
@@ -446,13 +447,13 @@ function checkAllChickenHits() {
     for (let i = chickens.length - 1; i >= 0; i--) {
       const chicken = chickens[i];
       const distance = missile.mesh.position.distanceTo(chicken.position);
+      console.log(`Missile ${missileId} at ${missile.mesh.position.toArray()} | Chicken at ${chicken.position.toArray()} | Distance: ${distance}`);
       if (distance < 5.0) {
         score += chicken.userData.isGold ? 2 : 1;
         updateInfo();
         spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
         playBakuhaSound(); // 爆発音再生
         scene.remove(chicken); // 鶏を一度消す
-        chickens.splice(i, 1); // 鶏配列から削除
         respawnChicken(chicken); // ランダム位置に再配置
         scene.add(chicken); // 再度フィールドに追加
         // ミサイル消去
@@ -1650,6 +1651,7 @@ function checkCoinCollision() {
   for (let i = coins.length - 1; i >= 0; i--) {
     const c = coins[i];
     const distance = bird.position.distanceTo(c.position);
+    console.log(`Player at ${bird.position.toArray()} | Coin at ${c.position.toArray()} | Distance: ${distance}`);
     if (distance < 3.2) {
       coins.splice(i, 1);
       scene.remove(c);
@@ -1680,7 +1682,6 @@ function checkChickenHitByMissile(missile) {
       spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
       playBakuhaSound(); // 爆発音再生
       scene.remove(chicken); // 鶏を一度消す
-      chickens.splice(chicken, 1); // 鶏配列から削除
       respawnChicken(chicken); // ランダム位置に再配置
       scene.add(chicken); // 再度フィールドに追加
       // ミサイル消去
@@ -1689,6 +1690,91 @@ function checkChickenHitByMissile(missile) {
       break;
     }
   }
+}
+
+// --- NPC（空を飛ぶ鳥・虫） ---
+function spawnNPC() {
+  const t = NPC_TYPES[Math.random() < 0.5 ? 0 : 1];
+  let mesh;
+  if (t.type === 'bird') {
+    mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7 * t.scale, 10, 8),
+      new THREE.MeshLambertMaterial({ color: t.color })
+    );
+  } else {
+    mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.35, 8, 6),
+      new THREE.MeshLambertMaterial({ color: t.color })
+    );
+  }
+  mesh.position.set(
+    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9,
+    6 + Math.random() * 20,
+    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9
+  );
+  mesh.userData = {
+    type: t.type,
+    dir: new THREE.Vector3(
+      (Math.random() - 0.5) * 0.6,
+      (Math.random() - 0.5) * 0.12,
+      (Math.random() - 0.5) * 0.6
+    ).normalize(),
+    speed: 0.1 + Math.random() * 0.15
+  };
+  npcs.push(mesh);
+  scene.add(mesh);
+  addCollisionObject(mesh, 2); // 衝突判定用のオブジェクトを追加
+}
+function maintainNPCs() {
+  while (npcs.length < 15) spawnNPC();
+}
+
+// --- 消滅サウンド ---
+function playMetuSound() {
+  const metu = document.getElementById('metu-audio');
+  if (metu) {
+    metu.currentTime = 0;
+    metu.volume = 0.8;
+    metu.play().catch(()=>{});
+  }
+}
+
+// --- ヒット時の処理強化 ---
+function handlePlayerHitRealtime(targetId, attackerId) {
+  if (targetId === myId) {
+    hp = Math.max(0, hp - 1);
+    updateInfo();
+    updateHeartDisplay(bird, hp);
+    spawnHitEffect(bird.position);
+    playUkeSound();
+    if (hp <= 0) {
+      bird.visible = false;
+      playMetuSound(); // 自分が消滅したとき
+      setTimeout(() => {
+        respawnPlayerRandom();
+        bird.visible = true;
+      }, 1800);
+    }
+  }
+  if (attackerId === myId) {
+    score += 10;
+    updateInfo();
+    playHitSound();
+  }
+  // スコア/HP同期
+  if (channel) channel.publish('hp_score', { id: myId, hp, score });
+}
+
+// --- Ably同期: ヒット・リスポーン・スコア/HP ---
+if (channel) {
+  channel.subscribe('player_hit', (msg) => {
+    const { targetId, attackerId } = msg.data;
+    handlePlayerHitRealtime(targetId, attackerId);
+    // 消滅時、撃墜側にもサウンド
+    if (peers[targetId] && peers[targetId].hp === 0) {
+      playMetuSound(); // 撃墜したプレイヤーにも
+    }
+  });
 }
 
 function animate() {
