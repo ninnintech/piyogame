@@ -1948,17 +1948,17 @@ function setupInput() {
         const downBtn = document.getElementById('down-btn');
         if (upBtn) {
             upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = 1; });
-            upBtn.addEventListener('touchend', (e) => { e.preventDefault(); move.up = 0; });
+            upBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; });
             upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; });
-            upBtn.addEventListener('mouseup', (e) => { e.preventDefault(); move.up = 0; });
-            upBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); move.up = 0; });
+            upBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; });
+            upBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; });
         }
         if (downBtn) {
             downBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; });
-            downBtn.addEventListener('touchend', (e) => { e.preventDefault(); move.up = 0; });
+            downBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; });
             downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; });
-            downBtn.addEventListener('mouseup', (e) => { e.preventDefault(); move.up = 0; });
-            downBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); move.up = 0; });
+            downBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; });
+            downBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; });
         }
     }
 
