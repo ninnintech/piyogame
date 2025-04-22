@@ -1601,13 +1601,20 @@ async function setupRealtimeConnection() {
     const updatePresenceInfo = async () => {
         try {
             const members = await channel.presence.get();
-            userCount = Array.isArray(members) ? members.length : 0;
+            if (!Array.isArray(members)) {
+                console.error("Presence情報の取得エラー: membersが配列ではありません", members);
+                userCount = 0;
+                updateInfo();
+                return;
+            }
+            userCount = members.length;
             updateInfo(); // 接続人数表示更新
 
             // 既存ピアの更新と新規ピアの追加
             const currentPeerIds = new Set(Object.keys(peers));
             for (const member of members) {
-                 if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
+                if (!member || typeof member !== 'object') continue;
+                if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
 
                 const state = member.data; // Presence data を使う
                 if (!state) continue; // データがない場合はスキップ
