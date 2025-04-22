@@ -1961,10 +1961,7 @@ function sendState() {
 
 // --- ゲームロジック ---
 function startGame() {
-    // ▼▼▼ myId の生成を削除 (initAbly で設定済みのため) ▼▼▼
-    // myId = `player_${Math.random().toString(36).slice(2, 11)}`;
-    // ▲▲▲ myId の生成を削除 ▲▲▲
-    // myName, myColor はログイン画面から設定されている想定
+
 
     console.log(`[startGame] Using My ID: ${myId}, Name: ${myName}, Color: ${myColor}`); // myId が設定されているか確認
 
