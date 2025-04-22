@@ -1600,6 +1600,18 @@ async function setupRealtimeConnection() {
 // 在室メンバー取得とUI更新
 const updatePresenceInfo = async () => {
     try {
+        if (!channel) {
+            console.error('Ably channel is not initialized.');
+            userCount = 0;
+            updateInfo();
+            return;
+        }
+        if (!ably || ably.connection.state !== 'connected') {
+            console.warn('Ably is not connected yet.');
+            userCount = 0;
+            updateInfo();
+            return;
+        }
         const members = await channel.presence.get();
         console.log('Ably presence.get() result:', members, Array.isArray(members));
         if (!Array.isArray(members)) {
@@ -1653,6 +1665,8 @@ const updatePresenceInfo = async () => {
 
     } catch (err) {
         console.error("Presence情報の取得/更新エラー:", err);
+        userCount = 0;
+        updateInfo();
     }
 };
     // 定期的に Presence 情報で同期 (例: 5秒ごと)
