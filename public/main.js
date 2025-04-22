@@ -2142,3 +2142,5 @@ function updateUIElements() {
 function renderScene() {
     renderer.render(scene, camera)
 }
+
+}
