@@ -834,11 +834,11 @@ function createChicken(isGold = false) {
 
 
 function randomChickenPosition() {
-  // X,Z: 中心±TERRAIN_SIZE*0.4, Y: 40〜80の空中
-  const x = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
-  const z = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
-  const y = 40 + Math.random() * 40;
-  return new THREE.Vector3(x, y, z);
+    // X,Z: 中心±TERRAIN_SIZE*0.4, Y: 40〜80の空中
+    const x = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
+    const z = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
+    const y = 40 + Math.random() * 40;
+    return new THREE.Vector3(x, y, z);
 }
 
 function spawnChickens() {
@@ -1093,7 +1093,7 @@ function randomBigHeartPosition() {
     // 条件: 地形が見つかり、高さが範囲内で、かつ水面(y<2など)でない
   } while ((y < 8 || y > 35 || y < 2) && tries < 20);
 
-  // もし適切な場所が見つからなかったらデフォルト位置
+  // もし適切な場所が見つからなければデフォルト位置
   if (tries >= 20) return new THREE.Vector3(0, 20, 0);
 
   return new THREE.Vector3(x, y + 3.5, z); // 地表から少し浮かせる
@@ -1417,7 +1417,7 @@ function updateDash() {
             removeDashEffect();
         }
         // ダッシュ中の体当たり判定 (鶏)
-        if (bird && bird.visible) {
+        if (bird && bird.visible) { // プレイヤーが存在し表示されている場合のみ更新
            for (let i = chickens.length - 1; i >= 0; i--) {
                const chicken = chickens[i];
                if (bird.position.distanceToSquared(chicken.position) < (3.0 + 3.5)**2) { // 半径和で判定
@@ -1576,12 +1576,12 @@ async function initAbly() {
     try {
         const apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : '';
         const response = await fetch(`${apiBase}/api/token`);
-        if (!response.ok) throw new Error(`トークン取得エラー: ${response.status} ${response.statusText}`);
+        if (!response.ok) throw new Error(`トークン取得エラー: ${response.status}`);
         const tokenRequest = await response.json();
         return new Ably.Realtime({ authCallback: (_, callback) => callback(null, tokenRequest) });
     } catch (error) {
         console.error('Ably初期化エラー:', error);
-        alert('Ably初期化エラー: ' + (error && error.message ? error.message : error));
+        alert('サーバー接続エラー: 認証トークンの取得に失敗しました。\nサーバーが動作しているか、URLが正しいか確認してください。');
         return null;
     }
 }
@@ -1593,131 +1593,69 @@ async function setupRealtimeConnection() {
 
     channel = ably.channels.get('bird-garden-3d-v2'); // チャンネル名変更推奨
 
-    // チャンネルを明示的にアタッチ
-    await new Promise((resolve, reject) => {
-        channel.attach((err) => {
-            if (err) {
-                console.error('Ably channel attach error:', err);
-                reject(err);
-            } else {
-                resolve();
+    // --- Presence (入退室管理) ---
+    await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
+    console.log("Presence Enter 完了");
+
+    // 在室メンバー取得とUI更新
+    const updatePresenceInfo = async () => {
+        try {
+            const members = await channel.presence.get();
+            userCount = Array.isArray(members) ? members.length : 0;
+            updateInfo(); // 接続人数表示更新
+
+            // 既存ピアの更新と新規ピアの追加
+            const currentPeerIds = new Set(Object.keys(peers));
+            for (const member of members) {
+                 if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
+
+                const state = member.data; // Presence data を使う
+                if (!state) continue; // データがない場合はスキップ
+
+                if (!peers[state.id]) { // 新規ピア
+                   console.log(`新規ピア参加: ${state.name}(${state.id})`);
+                   peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
+                   scene.add(peers[state.id].group);
+                } else { // 既存ピアの情報更新
+                    const peer = peers[state.id];
+                    peer.group.position.set(state.x || 0, state.y || 10, state.z || 0); // 位置も同期？
+                    peer.group.rotation.y = state.ry || 0; // 回転も同期？
+                    setBirdColor(peer.group, state.color || '#ffffff');
+                    peer.name = state.name || '???';
+                    peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
+                    peer.score = typeof state.score === 'number' ? state.score : 0;
+                    if (peer.nameObj) {
+                         peer.nameObj.nameSpan.textContent = peer.name;
+                         updateHeartDisplay(peer.nameObj, peer.hp);
+                    }
+                    peer.group.visible = peer.hp > 0; // HPが0なら非表示
+                }
+                currentPeerIds.delete(state.id); // 処理済みピアIDをセットから削除
             }
-        });
-    });
 
-// 在室メンバー取得とUI更新
-async function updatePresenceInfo() {
-    // ★★★ デバッグログ: 関数開始時の状態確認 ★★★
-    console.log(`updatePresenceInfo called. Ably state: ${ably?.connection?.state}, Channel state: ${channel?.state}`);
-
-    // ★★★ Ablyクライアントとチャンネルの状態チェック ★★★
-    if (!ably || ably.connection.state !== 'connected') {
-        console.warn(`Cannot get presence info: Ably client not connected (state: ${ably?.connection?.state}). Skipping update.`);
-        // UI表示などでユーザーに状態を伝えることも検討
-        return; // Ablyが接続されていなければ中断
-    }
-    if (!channel || channel.state !== 'attached') {
-         console.warn(`Cannot get presence info: Channel not attached (state: ${channel?.state}). Skipping update.`);
-        // 必要であれば channel.attach() を試みるか、待機する
-        // 例: channel.attach((err) => { if (!err) console.log('Channel attached'); });
-        return; // チャンネルがアタッチされていなければ中断
-    }
-
-    try {
-        // ★★★ デバッグログ: API呼び出し直前 ★★★
-        console.log(`Attempting to call channel.presence.get() for channel: ${channel.name}`);
-
-        const members = await channel.presence.get();
-
-        // ★★★ デバッグログ: API呼び出し直後と結果の型チェック ★★★
-        console.log('channel.presence.get() returned:', members, `(Type: ${typeof members})`);
-
-        // ★★★ undefined および配列でない場合のチェック ★★★
-        if (typeof members === 'undefined') {
-             // このケースは Ably SDK の予期せぬ挙動の可能性が高い
-             console.error("Presence情報取得エラー: channel.presence.get() returned undefined. Ably SDK or connection issue suspected.");
-             // リトライするか、エラーとして扱うか検討
-             // 一時的な問題かもしれないので、数回リトライするロジックを入れるのも手
-             userCount = 0; // 不明な状態なのでリセット
-             updateInfo();
-             return;
-        }
-        if (!Array.isArray(members)) {
-            // 本来エラーになるはずだが、念のためチェック
-            console.error("Presence情報取得エラー: membersが配列ではありません。Received:", members);
-            userCount = 0; // 不明な状態なのでリセット
-            updateInfo();
-            return;
-        }
-
-        // --- 正常系 ---
-        userCount = members.length;
-        updateInfo();
-
-        const currentPeerIds = new Set(Object.keys(peers));
-        for (const member of members) {
-            // 自分の clientId と Ably が内部的に使う clientId は異なることがあるので注意
-            // member.connectionId === ably.connection.id で比較する方がより確実な場合もある
-            if (member.clientId === ably.auth.clientId) continue; // 自分のクライアントIDは無視
-            const state = member.data;
-            if (!state || !state.id || state.id === myId) continue; // state, id の存在チェックと自分のIDを除外
-
-            if (!peers[state.id]) {
-                console.log(`新規ピア参加: ${state.name}(${state.id})`);
-                peers[state.id] = createPeerBird(state);
-                if (peers[state.id] && peers[state.id].group) {
-                    scene.add(peers[state.id].group);
-                } else {
-                    console.warn(`ピア ${state.id} のgroup生成に失敗、または group が null/undefined です。`);
-                }
-            } else {
-                // 既存ピアの更新ロジック... (変更なし)
-                const peer = peers[state.id];
-                // group が存在するかチェックしてから操作
-                if (peer.group) {
-                     setBirdColor(peer.group, state.color || '#ffffff');
-                     peer.group.visible = peer.hp > 0;
-                } else {
-                     console.warn(`ピア ${state.id} の group が見つかりません。更新をスキップします。`);
-                }
-                peer.name = state.name || '???';
-                peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
-                peer.score = typeof state.score === 'number' ? state.score : 0;
-                if (peer.nameObj) {
-                    peer.nameObj.nameSpan.textContent = peer.name;
-                    updateHeartDisplay(peer.nameObj, peer.hp);
-                }
+            // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
+            // presenceにいなくなったがpeersに残っているピアを削除
+            for (const oldPeerId of currentPeerIds) {
+                console.log(`ピア退出: ${peers[oldPeerId].name}(${oldPeerId})`);
+                removePeer(oldPeerId);
             }
-            currentPeerIds.delete(state.id);
-        }
+            updateRanking(); // ランキング更新
 
-        // Presenceにいなくなったピアを削除
-        for (const oldPeerId of currentPeerIds) {
-            console.log(`ピア退出: ${peers[oldPeerId]?.name || oldPeerId}`);
-            removePeer(oldPeerId);
+        } catch (err) {
+            console.error("Presence情報の取得/更新エラー:", err);
         }
-        updateRanking();
+    };
 
-    } catch (err) {
-        // ★★★ catch ブロックでのエラーハンドリング強化 ★★★
-        console.error("Presence情報の取得/更新中に例外発生:", err);
-        if (err instanceof Error) { // AblyErrorか通常のErrorか判定
-             console.error(`Error details: name=${err.name}, message=${err.message}, code=${err.code || 'N/A'}, statusCode=${err.statusCode || 'N/A'}`);
-        } else {
-             console.error("Caught non-Error object:", err);
-        }
-        // エラー内容に応じてUI表示やリトライ処理を検討
-    }
-} // updatePresenceInfo 関数の終わり
-
-    // 定期的に Presence 情報で同期
+    // 定期的に Presence 情報で同期 (例: 5秒ごと)
     setInterval(updatePresenceInfo, 5000);
-    await updatePresenceInfo();
+    await updatePresenceInfo(); // 初回実行
 
     // Presence イベントリスナー
     channel.presence.subscribe(['enter', 'leave', 'update'], updatePresenceInfo);
 
+
     // --- メッセージ購読 ---
+
     // 状態同期 (軽量化のため位置情報はPresence Updateに任せるか検討)
     channel.subscribe('state', (msg) => {
         const s = msg.data;
@@ -1734,6 +1672,7 @@ async function updatePresenceInfo() {
         // if(peer.nameObj) { /* ... */ }
         // peer.group.visible = peer.hp > 0;
     });
+
 
     // ミサイル発射同期
     channel.subscribe('fire', (msg) => {
@@ -1770,15 +1709,23 @@ async function updatePresenceInfo() {
     // HP/スコア更新同期
     channel.subscribe('hp_update', (msg) => {
         const data = msg.data;
-        if (!data || data.id === myId || !peers[data.id]) return;
-        const peer = peers[data.id];
-        peer.hp = data.hp;
-        peer.score = data.score;
-        peer.group.visible = peer.hp > 0; // HPに応じて表示設定
-        if (peer.nameObj) {
-            updateHeartDisplay(peer.nameObj, peer.hp);
+        if (!data || !data.id) return;
+        if (data.id === myId) {
+            // 自分のHP/スコアがサーバーから来た場合 (通常は不要だが念のため)
+            // hp = data.hp;
+            // score = data.score;
+            // updateInfo();
+            // updateHeartDisplay(bird.userData.nameObj, hp);
+        } else if (peers[data.id]) {
+            const peer = peers[data.id];
+            peer.hp = data.hp;
+            peer.score = data.score;
+            peer.group.visible = peer.hp > 0; // HPに応じて表示設定
+            if (peer.nameObj) {
+                updateHeartDisplay(peer.nameObj, peer.hp);
+            }
+            updateRanking(); // スコアが変わった可能性があるのでランキング更新
         }
-        updateRanking(); // スコアが変わった可能性があるのでランキング更新
     });
 
     // リスポーン同期
@@ -1922,8 +1869,6 @@ function setupInput() {
     // キーボード入力
     window.addEventListener('keydown', (e) => {
         switch (e.code) {
-            case 'KeyW': case 'ArrowUp': move.forward = 1; break;
-            case 'KeyS': case 'ArrowDown': move.forward = -1; break; // 後進を追加
             case 'KeyA': case 'ArrowLeft': move.turn = -1; break;
             case 'KeyD': case 'ArrowRight': move.turn = 1; break;
             case 'Space': move.up = 1; break;
@@ -1934,13 +1879,10 @@ function setupInput() {
     });
     window.addEventListener('keyup', (e) => {
         switch (e.code) {
-            case 'KeyW': case 'ArrowUp': if (move.forward === 1) move.forward = 0; break;
-            case 'KeyS': case 'ArrowDown': if (move.forward === -1) move.forward = 0; break;
             case 'KeyA': case 'ArrowLeft': if (move.turn === -1) move.turn = 0; break;
             case 'KeyD': case 'ArrowRight': if (move.turn === 1) move.turn = 0; break;
             case 'Space': if (move.up === 1) move.up = 0; break;
             case 'ShiftLeft': case 'ShiftRight': if (move.up === -1) move.up = 0; break;
-            // case 'KeyZ': stopDash(); break; // 離したら止まる場合
         }
     });
 
@@ -1960,23 +1902,15 @@ function setupInput() {
                 const force = data.force;
                 // y: 前後進 (-1:後, 1:前) -> forceで強度調整
                 // x: 左右旋回 (-1:左, 1:右)
-                move.forward = Math.sin(angle) * force * 1.5; // 前後進の感度調整
-                move.turn = Math.cos(angle) * force * 0.5;    // 旋回の感度調整
-                move.forward = Math.max(-1, Math.min(1, move.forward)); // -1から1の範囲に制限
-                move.turn = Math.max(-1, Math.min(1, move.turn));
-
-                 // 上昇/下降は別途ボタン推奨だが、簡易的に実装するなら
-                 // if (data.direction) {
-                 //   if (data.direction.y === 'up') move.up = force;
-                 //   else if (data.direction.y === 'down') move.up = -force;
-                 //   else move.up = 0;
-                 // }
+                move.turn = Math.cos(angle) * force * 1.5;    // 旋回の感度調整
+                move.up = Math.sin(angle) * force * 1.5; // 上昇/下降の感度調整
+                move.turn = Math.max(-1, Math.min(1, move.turn)); // -1から1の範囲に制限
+                move.up = Math.max(-1, Math.min(1, move.up));
             }
         });
         joystick.on('end', () => {
-            move.forward = 0;
             move.turn = 0;
-            move.up = 0; // 上昇/下降もリセット
+            move.up = 0;
         });
     } else if (!joystickZone) {
         console.warn("要素 #joystick-zone が見つかりません。");
@@ -1984,40 +1918,6 @@ function setupInput() {
         console.warn("nipplejs がロードされていません。");
     }
 
-    function setupInput() {
-        // ...既存のキーボードやジョイスティック設定...
-    
-        // --- モバイル用 上昇・下降ボタン ---
-        const upBtn = document.getElementById('up-btn');
-        const downBtn = document.getElementById('down-btn');
-        if (upBtn) {
-            upBtn.replaceWith(upBtn.cloneNode(true));
-        }
-        if (downBtn) {
-            downBtn.replaceWith(downBtn.cloneNode(true));
-        }
-        const freshUpBtn = document.getElementById('up-btn');
-        const freshDownBtn = document.getElementById('down-btn');
-        if (freshUpBtn) {
-            freshUpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn touchstart', move); });
-            freshUpBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn touchend', move); });
-            freshUpBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn mousedown', move); });
-            freshUpBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseup', move); });
-            freshUpBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseleave', move); });
-        } else {
-            console.warn('up-btn not found');
-        }
-        if (freshDownBtn) {
-            freshDownBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn touchstart', move); });
-            freshDownBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn touchend', move); });
-            freshDownBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn mousedown', move); });
-            freshDownBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseup', move); });
-            freshDownBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseleave', move); });
-        } else {
-            console.warn('down-btn not found');
-        }
-        console.log('setupInput: event listeners registered');
-    }
 
     // ボタン入力 (タッチとマウス)
     const setupButton = (id, downCallback, upCallback = null) => {
@@ -2031,11 +1931,12 @@ function setupInput() {
         btn.addEventListener('contextmenu', (e) => e.preventDefault()); // 右クリックメニュー阻止
     };
 
-    // setupButton('forward-btn', () => move.up = 1, () => move.up = 0); // 上昇ボタンに変更？
-    // setupButton('missile-btn', () => {if(hp>0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3()))});
-    // setupButton('dash-btn', () => {if(hp>0) startDash()});
-    // 例: 下降ボタン
-    // setupButton('down-btn', () => move.up = -1, () => move.up = 0);
+    setupButton('missile-btn', () => {if(hp>0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3()))});
+    setupButton('dash-btn', () => {if(hp>0) startDash()});
+    setupButton('up-btn', () => { move.up = 1; }, () => { move.up = 0; });
+    setupButton('down-btn', () => { move.up = -1; }, () => { move.up = 0; });
+    // 例: 前進ボタン
+    // setupButton('forward-btn', () => move.forward = 1, () => move.forward = 0);
 }
 
 
@@ -2072,7 +1973,7 @@ function startBGM() {
             bgm.play().then(() => {
                  document.removeEventListener('click', playBGM);
                  document.removeEventListener('touchstart', playBGM);
-            }).catch(()=>{}); // エラーは無視
+            }).catch(e => {});
         };
         document.addEventListener('click', playBGM);
         document.addEventListener('touchstart', playBGM);
@@ -2098,8 +1999,7 @@ function showLogin() {
 
     loginModal.style.display = 'flex';
 
-    loginBtn.onclick = null; // 既存リスナーを削除
-    loginBtn.addEventListener('click', () => {
+    loginBtn.onclick = () => {
         const name = nameInput.value.trim();
         const color = colorInput.value;
         if (!name) {
@@ -2114,7 +2014,7 @@ function showLogin() {
         myColor = color;
         loginModal.style.display = 'none';
         startGame(); // ゲーム開始
-    });
+    };
 }
 
 // --- イベントリスナー ---
@@ -2144,20 +2044,20 @@ document.addEventListener('visibilitychange', () => {
     } else {
         // フォアグラウンドに戻った時
         if (ably && ably.connection.state !== 'connected') {
-            // 再接続処理
+             // 再接続処理が必要な場合
+             // setupRealtimeConnection(); // 再初期化 or
+             // ably.connection.connect();
         }
          if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp }); // 再入室
         if (bgm && bgm.paused) bgm.play().catch(()=>{}); // BGM再開
     }
-
 });
+
 // ページを閉じる/移動する前の処理
 window.addEventListener('beforeunload', () => {
     if (channel) channel.presence.leave(); // 必ず離脱
     if (ably) ably.close(); // Ably接続を閉じる
 });
-
-
 
 
 // --- アニメーションループ ---
@@ -2253,12 +2153,8 @@ function updatePlayerMovement(deltaTime) {
     // 旋回 (deltaTimeを考慮)
     bird.rotation.y -= move.turn * turnRate * deltaTime;
 
-    // 前後進 (ワールド方向ベクトルを取得)
-    const moveDirection = bird.getWorldDirection(new THREE.Vector3());
-    const deltaPosition = moveDirection.multiplyScalar(move.forward * currentSpeed * deltaTime);
-
     // 上昇/下降
-    deltaPosition.y += move.up * upDownSpeed * deltaTime;
+    const deltaPosition = new THREE.Vector3(0, move.up * upDownSpeed * deltaTime, 0);
 
     // 現在位置に加算
     const nextPosition = bird.position.clone().add(deltaPosition);
@@ -2357,7 +2253,8 @@ function updateAircrafts(deltaTime) {
             if (a.children[3]) a.children[3].rotation.x = now * 40; // テールローター
         }
     }
-} // updateAircrafts の閉じカッコを追加
+}
+
 
 function updateProjectiles() {
     updateMissiles(); // ミサイルの移動、寿命、当たり判定
@@ -2418,27 +2315,3 @@ function updateUIElements() {
 function renderScene() {
     renderer.render(scene, camera);
 }
-
-// スマホでの中断/再開処理
-document.addEventListener('visibilitychange', () => {
-    const bgm = document.getElementById('bgm-audio');
-    if (document.hidden) {
-        if (channel) channel.presence.leave();
-        if (ably && ably.connection.state === 'connected') {
-            // ably.connection.close();
-        }
-        if (bgm && !bgm.paused) bgm.pause();
-    } else {
-        if (ably && ably.connection.state !== 'connected') {
-            // 再接続処理
-        }
-        if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
-        if (bgm && bgm.paused) bgm.play().catch(()=>{});
-    }
-});
-
-// ページを閉じる/移動する前の処理
-window.addEventListener('beforeunload', () => {
-    if (channel) channel.presence.leave(); // 必ず離脱
-    if (ably) ably.close(); // Ably接続を閉じる
-});

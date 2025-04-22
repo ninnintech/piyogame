@@ -139,21 +139,11 @@
   <!-- バーチャルジョイスティック用 -->
   <div id="joystick-zone" style="position:fixed;left:2vw;bottom:3vh;width:120px;height:120px;z-index:20;"></div>
   <!-- 右下アクションボタン（縦並び） -->
-  <!-- <div id="mobile-action-controls" style="position:fixed;right:5vw;bottom:18vh;z-index:20;display:flex;flex-direction:column;gap:16px;align-items:flex-end;">
+  <div id="mobile-action-controls" style="position:fixed;right:5vw;bottom:18vh;z-index:20;display:flex;flex-direction:column;gap:16px;align-items:flex-end;">
     <button id="missile-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#e3f2fd;color:#1565c0;font-weight:bold;">ミサイル</button>
     <button id="dash-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#ffe0b2;color:#e65100;font-weight:bold;">突撃</button>
-  </div> -->
-  <!-- 前進＋アクションボタン縦並び配置 -->
-  <div id="mobile-move-action-controls" style="position:fixed;right:5vw;bottom:6vh;z-index:20;display:flex;flex-direction:row;align-items:flex-end;gap:12px;">
-    <!-- 上昇・下降ボタンを右端に追加 -->
-    <div style="display:flex;flex-direction:column;gap:14px;align-items:center;">
-      <button id="up-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#e3f2fd;color:#1565c0;font-weight:bold;user-select:none;-webkit-user-select:none;touch-action:manipulation;">▲<br>上昇</button>
-      <button id="down-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#ffe0b2;color:#e65100;font-weight:bold;">▼<br>下降</button>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:14px;align-items:center;">
-      <button id="missile-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#e3f2fd;color:#1565c0;font-weight:bold;user-select:none;-webkit-user-select:none;touch-action:manipulation;">ミサイル</button>
-      <button id="dash-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#ffe0b2;color:#e65100;font-weight:bold;">突撃</button>
-    </div>
+    <button id="up-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#e0f7fa;color:#00796b;font-weight:bold;">上昇</button>
+    <button id="down-btn" style="width:56px;height:56px;border-radius:28px;font-size:19px;background:#fce4ec;color:#ad1457;font-weight:bold;">下降</button>
   </div>
   <!-- 効果音・BGM用オーディオ要素 -->
   <audio id="coin-audio" src="coin.mp3" preload="auto"></audio>
