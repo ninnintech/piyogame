@@ -448,7 +448,7 @@ function checkAllChickenHits() {
       const chicken = chickens[i];
       const distance = missile.mesh.position.distanceTo(chicken.position);
       console.log(`Missile ${missileId} at ${missile.mesh.position.toArray()} | Chicken at ${chicken.position.toArray()} | Distance: ${distance}`);
-      if (distance < 5.0) {
+      if (distance < 10.0) {
         score += chicken.userData.isGold ? 2 : 1;
         updateInfo();
         spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
@@ -466,7 +466,7 @@ function checkAllChickenHits() {
     // 虹色チキン
     if (rainbowChicken) {
       const distance = missile.mesh.position.distanceTo(rainbowChicken.position);
-      if (distance < 7.0) {
+      if (distance < 14.0) {
         rainbowChicken.userData.hp--;
         rainbowChicken.userData.lastHitPlayer = myId; // 最後に当てたプレイヤー
         spawnChickenEffect(rainbowChicken.position, false);
@@ -1490,7 +1490,8 @@ function launchOnlineMissile(ownerId, position, direction) {
 
 // ミサイルオブジェクトを作成
 function createMissile(position, direction) {
-  const geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
+  // --- Double the hitbox size: make missile visually larger and hitbox bigger ---
+  const geometry = new THREE.CylinderGeometry(0.2, 0.2, 1.6, 8); // doubled radius and length
   geometry.rotateX(Math.PI / 2);
   const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
   
@@ -1564,7 +1565,7 @@ function checkPlayerHitByMissile() {
   if (typeof hp !== 'number' || hp <= 0) return;
   for (let i = missiles.length - 1; i >= 0; i--) {
     const m = missiles[i];
-    if (m.mesh.position.distanceTo(bird.position) < 1.2) {
+    if (m.mesh.position.distanceTo(bird.position) < 2.4) {
       // サーバーにヒット通知
       if (channel) channel.publish('hit', { targetId: myId });
       scene.remove(m.mesh);
@@ -1601,7 +1602,7 @@ function showHitEffect() {
 for (const [mid, m] of Object.entries(allMissiles)) {
   m.mesh.position.addScaledVector(m.dir, 1.5);
   m.life++;
-  if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
+  if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 2.4 && hp > 0) {
     // channel.publish('hit', { targetId: myId });
     scene.remove(m.mesh);
     delete allMissiles[mid];
@@ -1611,7 +1612,7 @@ for (const [mid, m] of Object.entries(allMissiles)) {
   if (m.ownerId === myId) {
     for (const pid in peers) {
       const peer = peers[pid];
-      if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
+      if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 2.4) {
         // channel.publish('hit', { targetId: pid });
         scene.remove(m.mesh);
         delete allMissiles[mid];
@@ -1915,7 +1916,7 @@ function animate() {
     for (const [mid, m] of Object.entries(allMissiles)) {
       m.mesh.position.addScaledVector(m.dir, 1.5);
       m.life++;
-      if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
+      if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 2.4 && hp > 0) {
         // channel.publish('hit', { targetId: myId });
         scene.remove(m.mesh);
         delete allMissiles[mid];
@@ -1925,7 +1926,7 @@ function animate() {
       if (m.ownerId === myId) {
         for (const pid in peers) {
           const peer = peers[pid];
-          if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
+          if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 2.4) {
             // channel.publish('hit', { targetId: pid });
             scene.remove(m.mesh);
             delete allMissiles[mid];
@@ -2037,24 +2038,4 @@ function spawnGameObjects() {
   spawnCoinsAtSky(16);
   // 鶏
   spawnChickens();
-}
-
-// --- プレイヤーが攻撃を受けた時の処理 ---
-function handlePlayerHit(id) {
-  if (id === myId) {
-    hp = Math.max(0, hp - 1);
-    updateInfo();
-    updateHeartDisplay(bird, hp);
-    playHitSound && playHitSound();
-    if (hp === 0) {
-      // 撃墜時の処理（リスポーンやエフェクトなど必要に応じて追加）
-      playMetuSound && playMetuSound();
-    }
-  } else if (peers[id]) {
-    peers[id].hp = Math.max(0, (peers[id].hp || 1) - 1);
-    updateHeartDisplay(peers[id], peers[id].hp);
-    if (peers[id].hp === 0) {
-      playMetuSound && playMetuSound();
-    }
-  }
 }
