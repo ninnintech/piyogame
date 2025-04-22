@@ -1795,7 +1795,7 @@ function playHitSound() {
   if (hitAudio) {
     hitAudio.currentTime = 0;
     hitAudio.volume = 0.8;
-    hitAudio.play().catch(()=>{});
+    hitAudio.play().catch(() => {});
   }
 }
 function handlePlayerHitRealtime(targetId, attackerId) {
@@ -2103,5 +2103,15 @@ function spawnChickens() {
     chicken.position.copy(randomChickenPosition());
     chickens.push(chicken);
     scene.add(chicken);
+  }
+}
+
+// --- 消滅音再生 ---
+function playMetuSound() {
+  const metuAudio = document.getElementById('metu-audio');
+  if (metuAudio) {
+    metuAudio.currentTime = 0;
+    metuAudio.volume = 0.8;
+    metuAudio.play().catch(() => {});
   }
 }
