@@ -1605,12 +1605,21 @@ async function setupRealtimeConnection() {
     // Presence情報取得・同期
     const updatePresenceInfo = async () => {
         try {
-            const members = await channel.presence.get();
+            let members = await channel.presence.get();
+            // Ablyの仕様変更や通信エラーでnull/undefinedになる場合も考慮
             if (!Array.isArray(members)) {
-                console.error("Presence情報の取得エラー: membersが配列ではありません", members);
-                userCount = 0;
-                updateInfo();
-                return;
+                if (members && typeof members.items === 'function') {
+                    // Iterableな場合（Ably SDKのバージョンによってはitems()で取得）
+                    members = Array.from(members.items());
+                } else if (members && typeof members === 'object' && typeof members.length === 'number') {
+                    // 配列風オブジェクト
+                    members = Array.prototype.slice.call(members);
+                } else {
+                    console.error("Presence情報の取得エラー: membersが配列ではありません", members);
+                    userCount = 0;
+                    updateInfo();
+                    return;
+                }
             }
             userCount = members.length;
             updateInfo();
@@ -1837,7 +1846,7 @@ window.addEventListener('DOMContentLoaded', () => {
     try {
         initGraphics();
         showLogin();
-        // 必要に応じて他の初期化（例：BGM再生の準備など）
+        // 必要に応じて他の初期化（例：Ably接続、BGM再生など）
     } catch (e) {
         console.error("ログイン画面の初期化エラー:", e);
     }
