@@ -1612,68 +1612,44 @@ async function setupRealtimeConnection() {
          // Enter に失敗した場合の処理 (リトライなど) を検討
     }
 
+    // Presence情報取得・同期
+    const updatePresenceInfo = async () => {
+        try {
+            const members = await channel.presence.get();
+            if (!Array.isArray(members)) {
+                console.error("Presence情報の取得エラー: membersが配列ではありません", members);
+                userCount = 0;
+                updateInfo();
+                return;
+            }
+            userCount = members.length;
+            updateInfo();
+            // peers管理・UI更新処理（従来のロジックをここに）
+        } catch (err) {
+            console.error("Presence情報の取得/更新エラー:", err);
+        }
+    };
 
-    // updatePresenceInfo 関数の定義 (接続チェック強化版推奨)
-    const updatePresenceInfo = async () => { /* ... */ };
-
-    // 定期的な Presence 情報で同期 (接続チェック強化版を使うか、頻度を下げる)
-    // setInterval(updatePresenceInfo, 10000); // 例: 10秒ごと
-    // または setInterval 内で接続チェック
-    setInterval(() => {
-         if (ably && ably.connection.state === 'connected' && channel && channel.state === 'attached') {
-              updatePresenceInfo();
-         }
-    }, 10000);
-
-
-    // Presence イベントリスナー
-    channel.presence.subscribe(['enter', 'leave', 'update'], updatePresenceInfo);
-
-    // --- メッセージ購読 ---
-    // (変更なし)
-
-    // 定期的な状態送信 (変更なし)
-    // setInterval(sendState, 100);
-
-    // 初回の Presence 情報取得 (チャンネル接続後、少し待ってから実行するのも手)
-    // await new Promise(resolve => setTimeout(resolve, 500)); // 例: 500ms待つ
+    // 初回取得
     try {
-        await updatePresenceInfo(); // 初回実行
+        await updatePresenceInfo();
     } catch (initialGetErr) {
         console.error("初回 Presence 情報取得エラー:", initialGetErr);
     }
 
-}
-
     // 定期的に Presence 情報で同期 (例: 5秒ごと)
     setInterval(updatePresenceInfo, 5000);
-    await updatePresenceInfo(); // 初回実行
-
-    // Presence イベントリスナー
     channel.presence.subscribe(['enter', 'leave', 'update'], updatePresenceInfo);
 
-
     // --- メッセージ購読 ---
-
-    // 状態同期 (軽量化のため位置情報はPresence Updateに任せるか検討)
     channel.subscribe('state', (msg) => {
         const s = msg.data;
         if (!s || s.id === myId || !peers[s.id]) return;
         const peer = peers[s.id];
-        // 位置と回転は頻繁に変わるので、別イベント or Presence update が良いかも
-        peer.group.position.lerp(new THREE.Vector3(s.x, s.y, s.z), 0.5); // Lerpで滑らかに
-        peer.group.rotation.y = s.ry; // 回転は即時反映 or Lerp
-        // 色、名前、HP、スコアは Presence update で同期されるはずだが、念のため更新
-        // setBirdColor(peer.group, s.color);
-        // peer.name = s.name;
-        // peer.hp = s.hp;
-        // peer.score = s.score;
-        // if(peer.nameObj) { /* ... */ }
-        // peer.group.visible = peer.hp > 0;
+        peer.group.position.lerp(new THREE.Vector3(s.x, s.y, s.z), 0.5);
+        peer.group.rotation.y = s.ry;
     });
 
-
-    // ミサイル発射同期
     channel.subscribe('fire', (msg) => {
         const m = msg.data;
         if (!m || m.owner === myId || allMissiles[m.id]) return; // 自分 or 既に存在する場合は無視
@@ -1694,10 +1670,8 @@ async function setupRealtimeConnection() {
             // launchMissile が allMissiles に追加しなかった場合のエラー処理
             console.warn(`受信したミサイル ${m.id} がローカルで生成/管理されませんでした。`);
         }
-
     });
 
-    // 被弾同期
     channel.subscribe('hit', (msg) => {
         const { targetId, attackerId } = msg.data;
         if (!targetId) return;
@@ -1705,11 +1679,9 @@ async function setupRealtimeConnection() {
         handlePlayerHit(targetId, attackerId);
     });
 
-    // HP/スコア更新同期
     channel.subscribe('hp_update', (msg) => {
         const data = msg.data;
-        if (!data || !data.id) return;
-        if (data.id === myId) {
+        if (!data || data.id === myId) {
             // 自分のHP/スコアがサーバーから来た場合 (通常は不要だが念のため)
             // hp = data.hp;
             // score = data.score;
@@ -1727,7 +1699,6 @@ async function setupRealtimeConnection() {
         }
     });
 
-    // リスポーン同期
     channel.subscribe('respawn', (msg) => {
          const data = msg.data;
          if (!data || data.id === myId || !peers[data.id]) return;
@@ -1741,7 +1712,6 @@ async function setupRealtimeConnection() {
          }
     });
 
-    // 虹色チキン被弾同期
     channel.subscribe('hit_rainbow', (msg) => {
         const { attackerId } = msg.data;
         if (!rainbowChicken || !rainbowChicken.visible) return;
