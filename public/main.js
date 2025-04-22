@@ -2213,3 +2213,134 @@ async function startGame() {
     }
 }
 window.startGame = startGame;
+
+// --- 入力初期化 ---
+function initInput() {
+    // キーボード
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    // ボタン
+    const btns = [
+        { id: 'btn-missile', action: () => launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3())) },
+        { id: 'btn-attack', action: () => startDash() },
+        { id: 'btn-up', action: () => move.up = 1 },
+        { id: 'btn-down', action: () => move.up = -1 }
+    ];
+    btns.forEach(({id, action}) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.ontouchstart = btn.onmousedown = action;
+            btn.ontouchend = btn.onmouseup = () => { if(id==='btn-up'||id==='btn-down') move.up = 0; };
+        }
+    });
+}
+
+function onKeyDown(e) {
+    switch(e.key) {
+        case 'w': case 'ArrowUp': move.forward = 1; break;
+        case 's': case 'ArrowDown': move.forward = -1; break;
+        case 'a': case 'ArrowLeft': move.turn = -1; break;
+        case 'd': case 'ArrowRight': move.turn = 1; break;
+        case ' ': move.up = 1; break;
+        case 'Shift': move.up = -1; break;
+    }
+}
+function onKeyUp(e) {
+    switch(e.key) {
+        case 'w': case 'ArrowUp': case 's': case 'ArrowDown': move.forward = 0; break;
+        case 'a': case 'ArrowLeft': case 'd': case 'ArrowRight': move.turn = 0; break;
+        case ' ': case 'Shift': move.up = 0; break;
+    }
+}
+
+// --- ジョイスティックUI ---
+function showJoystick() {
+    if (!window.nipplejs) return;
+    const joystickZone = document.getElementById('joystick-zone');
+    if (!joystickZone) {
+        const zone = document.createElement('div');
+        zone.id = 'joystick-zone';
+        zone.style.position = 'absolute';
+        zone.style.left = '10px';
+        zone.style.bottom = '10px';
+        zone.style.width = '120px';
+        zone.style.height = '120px';
+        zone.style.zIndex = 10;
+        document.body.appendChild(zone);
+    }
+    const manager = nipplejs.create({
+        zone: document.getElementById('joystick-zone'),
+        mode: 'static',
+        position: { left: '60px', bottom: '60px' },
+        color: 'blue',
+        size: 100
+    });
+    manager.on('move', (evt, data) => {
+        if (data && data.angle && data.distance > 10) {
+            const rad = data.angle.radian;
+            move.forward = Math.cos(rad);
+            move.turn = Math.sin(rad);
+        }
+    });
+    manager.on('end', () => {
+        move.forward = 0; move.turn = 0;
+    });
+}
+
+// --- BGMのaudio要素IDをbgmに統一（HTML側も要確認） ---
+
+// startGame内で必ずinitInputを呼ぶ
+async function startGame() {
+    // ログイン画面を非表示
+    const loginModal = document.getElementById('login-modal');
+    if (loginModal) loginModal.style.display = 'none';
+
+    // ゲームキャンバスを表示
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) canvas.style.display = 'block';
+
+    // 入力初期化
+    if (typeof initInput === 'function') {
+        initInput();
+    }
+
+    // 必要な初期化処理（例：Ably接続、BGM再生など）
+    if (!ably) {
+        myId = myId || `Guest_${Math.random().toString(36).slice(2, 7)}`;
+        ably = await initAbly(myId); // Promiseならawait
+    }
+    if (ably && typeof setupRealtimeConnection === 'function') {
+        setupRealtimeConnection();
+    }
+    // BGM再生例
+    const bgm = document.getElementById('bgm');
+    if (bgm && bgm.paused) {
+        bgm.play().catch(()=>{});
+    }
+
+    // Three.jsグラフィックス初期化（必ず呼ぶ）
+    if (typeof initGraphics === 'function') {
+        initGraphics();
+    }
+
+    // 地形・オブジェクト・プレイヤー鳥を必ず生成
+    if (typeof createTerrain === 'function') {
+        createTerrain();
+    }
+    if (typeof placeObjects === 'function') {
+        placeObjects();
+    }
+    if (typeof setupPlayerBird === 'function') {
+        setupPlayerBird();
+    }
+
+    // 3Dスティック（ジョイスティックUI）表示
+    if (typeof showJoystick === 'function') {
+        showJoystick();
+    }
+
+    // アニメーションループ開始（必ず呼ぶ）
+    if (typeof animate === 'function') {
+        requestAnimationFrame(animate);
+    }
+}
