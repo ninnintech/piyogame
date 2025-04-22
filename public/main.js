@@ -1959,50 +1959,6 @@ function sendState() {
 }
 
 
-// --- ゲームロジック ---
-function startGame() {
-
-
-    console.log(`[startGame] Using My ID: ${myId}, Name: ${myName}, Color: ${myColor}`); // myId が設定されているか確認
-
-    initGraphics();
-    createTerrain();
-    placeObjects();
-    // setupPlayerBird は myId が確定してから呼ぶ
-    // setupPlayerBird(); // ← Ably接続後の方が良いかも？
-
-    setupInput();
-
-    infoDiv = document.getElementById('info');
-    rankingDiv = document.getElementById('ranking');
-    dashGaugeElement = document.getElementById('dash-gauge');
-
-    updateInfo();
-    updateRanking();
-
-    // Ably接続開始 (initAbly を呼び出し、結果を ably に設定)
-    initAbly().then(ablyInstance => {
-        if (!ablyInstance) {
-             // initAbly 内で alert が出るはずだが、念のため
-             throw new Error("Ably の初期化に失敗しました。");
-        }
-        ably = ablyInstance; // グローバル変数 ably にインスタンスを格納
-
-        // Ablyインスタンスが取得できた後にプレイヤーバードを設定
-        setupPlayerBird();
-
-        // Ablyインスタンスを使って接続設定
-        return setupRealtimeConnection();
-    }).then(() => {
-        console.log("Ably接続セットアップ完了");
-        requestAnimationFrame(animate); // 接続後にアニメーション開始
-    }).catch(err => {
-        console.error("Ably接続プロセスエラー:", err);
-        alert("オンライン接続に失敗しました。詳細: " + err);
-        // オフラインモードやエラー表示など
-        // requestAnimationFrame(animate); // エラーでもゲームループを開始する場合
-    });
-}
 
 
 function setupInput() {
