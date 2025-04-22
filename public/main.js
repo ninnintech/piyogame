@@ -1947,18 +1947,18 @@ function setupInput() {
         const upBtn = document.getElementById('up-btn');
         const downBtn = document.getElementById('down-btn');
         if (upBtn) {
-            upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = 1; });
-            upBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; });
-            upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; });
-            upBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; });
-            upBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; });
+            upBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn touchstart', move); });
+            upBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn touchend', move); });
+            upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn mousedown', move); });
+            upBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseup', move); });
+            upBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseleave', move); });
         }
         if (downBtn) {
-            downBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; });
-            downBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; });
-            downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; });
-            downBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; });
-            downBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; });
+            downBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn touchstart', move); });
+            downBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn touchend', move); });
+            downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn mousedown', move); });
+            downBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseup', move); });
+            downBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseleave', move); });
         }
     }
 
