@@ -1575,17 +1575,12 @@ function escapeHTML(str) {
 async function initAbly() {
     try {
         const apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : '';
-        const response = await fetch(`${apiBase}/api/token`);
-        if (!response.ok) throw new Error(`トークン取得エラー: ${response.status}`);
-        const tokenRequest = await response.json();
-        console.log('[DEBUG] Ably tokenRequest:', tokenRequest);
-        if (!tokenRequest || (!tokenRequest.token && !tokenRequest.key && !tokenRequest.id)) {
-            throw new Error('Ablyトークンレスポンスが不正です: ' + JSON.stringify(tokenRequest));
-        }
-        return new Ably.Realtime({ authCallback: (_, callback) => callback(null, tokenRequest) });
+        const authUrl = `${apiBase}/api/token`;
+        // authUrl方式で初期化（SDKが自動でトークン取得）
+        return new Ably.Realtime({ authUrl, clientId: 'user-' + Math.random().toString(36).substring(2, 9) });
     } catch (error) {
         console.error('Ably初期化エラー:', error);
-        alert('サーバー接続エラー: 認証トークンの取得に失敗しました。\nサーバーが動作しているか、URLが正しいか確認してください。');
+        alert('サーバー接続エラー: 認証トークンの取得に失敗しました。\nサーバーが動作していて、URLが正しいか確認してください。');
         return null;
     }
 }
@@ -1943,16 +1938,16 @@ function setupInput() {
     const setupButton = (id, downCallback, upCallback = null) => {
         const btn = document.getElementById(id);
         if (!btn) return;
-        btn.addEventListener('touchstart', (e) => { if(hp>0) downCallback(); e.preventDefault(); }, { passive: false });
+        btn.addEventListener('touchstart', (e) => { if(hp > 0) downCallback(); e.preventDefault(); }, { passive: false });
         if (upCallback) btn.addEventListener('touchend', upCallback);
-        btn.addEventListener('mousedown', () => {if(hp>0) downCallback()});
+        btn.addEventListener('mousedown', () => { if(hp > 0) downCallback() });
         if (upCallback) btn.addEventListener('mouseup', upCallback);
         if (upCallback) btn.addEventListener('mouseleave', upCallback); // 範囲外でも離す
         btn.addEventListener('contextmenu', (e) => e.preventDefault()); // 右クリックメニュー阻止
     };
 
-    setupButton('missile-btn', () => {if(hp>0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3()))});
-    setupButton('dash-btn', () => {if(hp>0) startDash()});
+    setupButton('missile-btn', () => { if(hp > 0) launchMissile(myId, bird.position, bird.getWorldDirection(new THREE.Vector3())) });
+    setupButton('dash-btn', () => { if(hp > 0) startDash() });
     setupButton('up-btn', () => { move.up = 1; }, () => { move.up = 0; });
     setupButton('down-btn', () => { move.up = -1; }, () => { move.up = 0; });
     // 例: 前進ボタン
