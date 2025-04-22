@@ -1601,7 +1601,7 @@ for (const [mid, m] of Object.entries(allMissiles)) {
   m.mesh.position.addScaledVector(m.dir, 1.5);
   m.life++;
   if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
-    // channel.publish('hit', { targetId: myId });
+    channel && channel.publish('hit', { targetId: myId });
     scene.remove(m.mesh);
     delete allMissiles[mid];
     handlePlayerHit(myId); // 自分が撃墜された時の処理を呼び出す
@@ -1611,7 +1611,7 @@ for (const [mid, m] of Object.entries(allMissiles)) {
     for (const pid in peers) {
       const peer = peers[pid];
       if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
-        // channel.publish('hit', { targetId: pid });
+        channel && channel.publish('hit', { targetId: pid });
         scene.remove(m.mesh);
         delete allMissiles[mid];
         break;
@@ -1624,368 +1624,40 @@ for (const [mid, m] of Object.entries(allMissiles)) {
   }
 }
 
-// --- NPC（空を飛ぶ鳥・虫） ---
-function spawnNPC() {
-  const t = NPC_TYPES[Math.random() < 0.5 ? 0 : 1];
-  let mesh;
-  if (t.type === 'bird') {
-    mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.7 * t.scale, 10, 8),
-      new THREE.MeshLambertMaterial({ color: t.color })
-    );
-  } else {
-    mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.35, 8, 6),
-      new THREE.MeshLambertMaterial({ color: t.color })
-    );
-  }
-  mesh.position.set(
-    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9,
-    6 + Math.random() * 20,
-    (Math.random() - 0.5) * TERRAIN_SIZE * 0.9
-  );
-  mesh.userData = {
-    type: t.type,
-    dir: new THREE.Vector3(
-      (Math.random() - 0.5) * 0.6,
-      (Math.random() - 0.5) * 0.12,
-      (Math.random() - 0.5) * 0.6
-    ).normalize(),
-    speed: 0.1 + Math.random() * 0.15
-  };
-  npcs.push(mesh);
-  scene.add(mesh);
-  addCollisionObject(mesh, 2); // 衝突判定用のオブジェクトを追加
-}
-function maintainNPCs() {
-  while (npcs.length < 15) spawnNPC();
-}
-
-// --- コイン ---
-function spawnCoin() {
-  // マップ全体にコインを散りばめる
-  let placed = false;
-  let tryCount = 0;
-  while (!placed && tryCount < 30) {
-    // TERRAIN_SIZEの9割をランダムに使う
-    const x = (Math.random() - 0.5) * TERRAIN_SIZE * 0.9;
-    const z = (Math.random() - 0.5) * TERRAIN_SIZE * 0.9;
-    const y = 7 + Math.random() * 8;
-    let tooClose = false;
-    for (const c of coins) {
-      if (c.position.distanceTo(new THREE.Vector3(x, y, z)) < 16) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (!tooClose) {
-      const geometry = new THREE.TorusGeometry(2.0, 0.7, 32, 64);
-      geometry.scale(1, 1.8, 1); // 縦長に
-      const material = new THREE.MeshBasicMaterial({
-        color: 0xFFFF99,
-        transparent: true,
-        opacity: 0.93
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(x, y, z);
-      mesh.rotation.x = Math.PI/2;
-      mesh.castShadow = true;
-      mesh.receiveShadow = false;
-      coins.push(mesh);
-      scene.add(mesh);
-      // addCollisionObject(mesh, 2); // コインは衝突判定に追加しない
-      placed = true;
-    }
-    tryCount++;
-  }
-}
-
-// --- コインの当たり判定 ---
-function checkCoinCollision() {
-  for (let i = coins.length - 1; i >= 0; i--) {
-    const c = coins[i];
-    const distance = bird.position.distanceTo(c.position);
-    if (distance < 3.2) {
-      coins.splice(i, 1);
-      scene.remove(c);
-      score++;
+// --- プレイヤーが撃たれた時の処理 ---
+function handlePlayerHit(targetId) {
+  if (targetId === myId) {
+    if (hp > 0) {
+      hp--;
       updateInfo();
-      playCoinSound && playCoinSound();
-      spawnCoin(); // 新たなコインを即出現
+      updateHeartDisplay(bird, hp);
+      showHitEffect && showHitEffect();
+      playHitSound && playHitSound();
+      if (hp <= 0) {
+        bird.position.set(0, 6, 0); // リスポーン位置に移動
+        hp = maxHP;
+        updateInfo();
+        updateHeartDisplay(bird, hp);
+      }
+    }
+  } else if (peers[targetId]) {
+    const peer = peers[targetId];
+    if (peer.hp > 0) {
+      peer.hp--;
+      updateHeartDisplay(peer, peer.hp);
+      if (peer.hp <= 0) {
+        peer.group.visible = false;
+      }
     }
   }
 }
 
-function playCoinSound() {
-  var coinAudio = document.getElementById('coin-audio');
-  if (coinAudio) {
-    coinAudio.currentTime = 0;
-    coinAudio.volume = 0.6;
-    coinAudio.play().catch(()=>{});
-  }
+// --- Ably: ヒットイベント受信 ---
+if (channel) {
+  channel.subscribe('hit', (msg) => {
+    const { targetId } = msg.data;
+    handlePlayerHit(targetId);
+  });
 }
 
-// --- ミサイルと鶏の当たり判定 ---
-function checkChickenHitByMissile(missile) {
-  for (const chicken of chickens) {
-    if (missile.mesh.position.distanceTo(chicken.position) < 5.0) {
-      // スコア加算（金色は2倍）
-      score++;
-      updateInfo();
-      spawnChickenEffect(chicken.position, chicken.userData.isGold); // エフェクト追加
-      playBakuhaSound(); // 爆発音再生
-      scene.remove(chicken); // 鶏を一度消す
-      chickens.splice(chicken, 1); // 鶏配列から削除
-      respawnChicken(chicken); // ランダム位置に再配置
-      scene.add(chicken); // 再度フィールドに追加
-      // ミサイル消去
-      scene.remove(missile.mesh);
-      missile.life = 0;
-      break;
-    }
-  }
-}
-
-function animate() {
-  try {
-    // コイン演出
-    const nowRaw = performance.now();
-    const now = nowRaw * 0.002;
-    for (const c of coins) {
-      c.rotation.y += 0.23;
-      c.rotation.z += 0.04;
-      const h = 0.13 + 0.08 * Math.sin(now + c.position.x);
-      c.material.color.setHSL(h, 1.0, 0.7 + 0.12 * Math.sin(now + c.position.z));
-      c.material.emissiveIntensity = 1.0 + 0.7 * Math.abs(Math.sin(now*2 + c.position.y));
-      c.material.opacity = 0.93 + 0.05 * Math.abs(Math.sin(now*3 + c.position.x));
-    }
-    // ダッシュモード管理
-    if (dashActive && dashGauge > 0) {
-      dashGauge -= DASH_DECREASE_PER_FRAME;
-      if (dashGauge <= 0) {
-        dashGauge = 0;
-        dashActive = false;
-        dashKeyHeld = false;
-      }
-    } else if (!dashActive && dashGauge < 1.0) {
-      dashGauge += DASH_RECOVER_PER_FRAME;
-      if (dashGauge > 1.0) dashGauge = 1.0;
-    }
-    updateDashGaugeUI();
-    // 鳥の移動
-    let speed = 0.22;
-    if (dashActive) speed *= 3.0;
-    // 旋回慣性用変数
-    let turnSpeed = 0;
-    const TURN_ACCEL = 0.004;   // 押し続けた時の加速量
-    const TURN_DECAY = 0.92;    // 離した時の減衰率
-    const TURN_MAX = 0.034;     // 最大旋回速度
-    if (move.turn !== 0) {
-      turnSpeed += move.turn * TURN_ACCEL;
-      if (turnSpeed > TURN_MAX) turnSpeed = TURN_MAX;
-      if (turnSpeed < -TURN_MAX) turnSpeed = -TURN_MAX;
-    } else {
-      turnSpeed *= TURN_DECAY;
-      if (Math.abs(turnSpeed) < 0.0005) turnSpeed = 0;
-    }
-    bird.rotation.y -= turnSpeed;
-    const dir = new THREE.Vector3(Math.sin(bird.rotation.y), 0, Math.cos(bird.rotation.y));
-    bird.position.addScaledVector(dir, move.forward * speed);
-    bird.position.y += move.up * 0.13;
-    bird.position.x = Math.max(-TERRAIN_SIZE/2+2, Math.min(TERRAIN_SIZE/2-2, bird.position.x));
-    bird.position.y = Math.max(2, Math.min(80, bird.position.y));
-    bird.position.z = Math.max(-TERRAIN_SIZE/2+2, Math.min(TERRAIN_SIZE/2-2, bird.position.z));
-    // 衝突判定と多重補正（最大10回）
-    let fixCount = 0;
-    while (fixCount < 10) {
-      const collision = checkCollision(bird.position, 2);
-      if (!collision.collided) break;
-      let pushDir = bird.position.clone().sub(collision.object.position);
-      if (pushDir.lengthSq() < 1e-6) pushDir.set(0, 1, 0);
-      pushDir.normalize();
-      const safePos = collision.object.position.clone().add(pushDir.multiplyScalar(collision.radius + 2));
-      bird.position.copy(safePos);
-      fixCount++;
-    }
-    // カメラ追従
-    camera.position.lerp(
-      new THREE.Vector3(
-        bird.position.x - 12 * Math.sin(bird.rotation.y),
-        bird.position.y + 6,
-        bird.position.z - 12 * Math.cos(bird.rotation.y)
-      ),
-      0.15
-    );
-    camera.lookAt(bird.position);
-    // 羽ばたきアニメーション
-    wingAngle += 0.15 * wingDir;
-    if (wingAngle > 0.7 || wingAngle < -0.7) wingDir *= -1;
-    leftWing.rotation.x = wingAngle;
-    rightWing.rotation.x = -wingAngle;
-    // 車の移動
-    cars.forEach((car, i) => {
-      car.position.x += 0.45 * Math.cos(car.userData.dir);
-      car.position.z += 0.45 * Math.sin(car.userData.dir);
-      if (car.position.x > TERRAIN_SIZE/2) car.position.x = -TERRAIN_SIZE/2;
-      if (car.position.x < -TERRAIN_SIZE/2) car.position.x = TERRAIN_SIZE/2;
-      if (car.position.z > TERRAIN_SIZE/2) car.position.z = -TERRAIN_SIZE/2;
-      if (car.position.z < -TERRAIN_SIZE/2) car.position.z = TERRAIN_SIZE/2;
-    });
-    // 飛行機・ヘリコプターの移動
-    for(const a of aircrafts){
-      if(a.userData.type==='airplane'){
-        // 円軌道を周回
-        const rad = 260 + 110*Math.sin(a.userData.phase);
-        const spd = 0.00018 + 0.00012*Math.cos(a.userData.phase);
-        a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
-        a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
-        a.position.y = a.userData.baseY + Math.sin(nowRaw*0.001 + a.userData.phase)*6;
-        a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
-      } else if(a.userData.type==='helicopter'){
-        // 小さめの円軌道
-        const rad = 120 + 30*Math.sin(a.userData.phase);
-        const spd = 0.00023 + 0.00015*Math.cos(a.userData.phase);
-        a.position.x = Math.cos(nowRaw*spd + a.userData.phase)*rad;
-        a.position.z = Math.sin(nowRaw*spd + a.userData.phase)*rad;
-        a.position.y = a.userData.baseY + Math.sin(nowRaw*0.0017 + a.userData.phase)*5;
-        a.rotation.y = Math.PI/2 - (nowRaw*spd + a.userData.phase);
-        // ローター回転
-        a.children[2].rotation.y = nowRaw*0.04;
-        a.children[3].rotation.x = nowRaw*0.12;
-      }
-    }
-    // NPC生成・移動
-    maintainNPCs();
-    for (const n of npcs) {
-      n.position.addScaledVector(n.userData.dir, n.userData.speed);
-      if (n.position.x < -TERRAIN_SIZE/2 || n.position.x > TERRAIN_SIZE/2) n.userData.dir.x *= -1;
-      if (n.position.y < 3 || n.position.y > 35) n.userData.dir.y *= -1;
-      if (n.position.z < -TERRAIN_SIZE/2 || n.position.z > TERRAIN_SIZE/2) n.userData.dir.z *= -1;
-    }
-    // オンライン同期ミサイルの移動
-    for (const [mid, m] of Object.entries(allMissiles)) {
-      m.mesh.position.addScaledVector(m.dir, 1.5);
-      m.life++;
-      if (m.ownerId !== myId && m.mesh.position.distanceTo(bird.position) < 1.2 && hp > 0) {
-        // channel.publish('hit', { targetId: myId });
-        scene.remove(m.mesh);
-        delete allMissiles[mid];
-        handlePlayerHit(myId); // 自分が撃墜された時の処理を呼び出す
-        continue;
-      }
-      if (m.ownerId === myId) {
-        for (const pid in peers) {
-          const peer = peers[pid];
-          if (peer && peer.group && peer.hp > 0 && m.mesh.position.distanceTo(peer.group.position) < 1.2) {
-            // channel.publish('hit', { targetId: pid });
-            scene.remove(m.mesh);
-            delete allMissiles[mid];
-            break;
-          }
-        }
-      }
-      if (m.life > 60) {
-        scene.remove(m.mesh);
-        delete allMissiles[mid];
-      }
-    }
-    // ローカルミサイルの移動
-    updateLocalMissiles();
-    checkAllChickenHits();
-    // 鶏の移動
-    for (const chicken of chickens) {
-      moveChickenSlowly(chicken);
-    }
-    updateMyNameObjPosition();
-    Object.values(peers).forEach(updateNameObjPosition);
-    // Object.values(peers).forEach(peer => {
-    //   updatePeerHeartDisplay(peer, peer.hp);
-    // });
-    checkCoinCollision();
-    checkPlayerHitByMissile(); // 追加
-    renderer.render(scene, camera);
-  } catch (e) {
-    if (!animate.lastError || animate.lastError !== String(e)) {
-      animate.lastError = String(e);
-      console.error("[animate] エラー発生:", e);
-      // エラー内容を画面にも表示
-      let errDiv = document.getElementById('error-log');
-      if (!errDiv) {
-        errDiv = document.createElement('div');
-        errDiv.id = 'error-log';
-        errDiv.style.position = 'fixed';
-        errDiv.style.bottom = '10px';
-        errDiv.style.left = '10px';
-        errDiv.style.background = 'rgba(255,0,0,0.85)';
-        errDiv.style.color = '#fff';
-        errDiv.style.padding = '12px 24px';
-        errDiv.style.zIndex = 9999;
-        errDiv.style.fontSize = '16px';
-        errDiv.style.borderRadius = '8px';
-        document.body.appendChild(errDiv);
-      }
-      errDiv.textContent = '[animate] エラー: ' + (e && e.stack ? e.stack : e);
-    }
-  } finally {
-    // ループが止まらないよう必ず次フレームを要求
-    requestAnimationFrame(animate);
-  }
-}
 animate();
-
-// --- コインを空中に均等配置する関数 ---
-function spawnCoinsAtSky(count = 16) {
-  // 空中にコインを均等配置
-  for (let i = 0; i < count; i++) {
-    let placed = false;
-    let tryCount = 0;
-    while (!placed && tryCount < 30) {
-      // 空の中央寄りエリアに配置
-      const angle = (i / count) * Math.PI * 2;
-      const radius = 120 + Math.random() * 90;
-      const x = Math.cos(angle) * radius + (Math.random() - 0.5) * 30;
-      const z = Math.sin(angle) * radius + (Math.random() - 0.5) * 30;
-      const y = 38 + Math.random() * 20;
-      let tooClose = false;
-      for (const c of coins) {
-        if (c.position.distanceTo(new THREE.Vector3(x, y, z)) < 16) {
-          tooClose = true;
-          break;
-        }
-      }
-      if (!tooClose) {
-        const geometry = new THREE.TorusGeometry(2.0, 0.7, 32, 64);
-        geometry.scale(1, 1.8, 1);
-        const material = new THREE.MeshBasicMaterial({
-          color: 0xFFFF99,
-          transparent: true,
-          opacity: 0.93
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(x, y, z);
-        mesh.rotation.x = Math.PI/2;
-        mesh.castShadow = true;
-        mesh.receiveShadow = false;
-        coins.push(mesh);
-        scene.add(mesh);
-        // addCollisionObject(mesh, 2); // コインは衝突判定に追加しない
-        placed = true;
-      }
-      tryCount++;
-    }
-  }
-}
-
-// --- ゲーム開始時にコインと鶏を必ず出現させる関数 ---
-function spawnGameObjects() {
-  // コイン・鶏を初期化し出現させる
-  // 既存オブジェクトを消去
-  for (const c of coins) scene.remove(c);
-  coins.length = 0;
-  for (const c of chickens) scene.remove(c);
-  chickens.length = 0;
-  // コイン
-  spawnCoinsAtSky(16);
-  // 鶏
-  spawnChickens();
-}
