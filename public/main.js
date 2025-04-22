@@ -2079,6 +2079,10 @@ function spawnGameObjects() {
   spawnCoinsAtSky(16);
   // 鶏
   spawnChickens();
+  // --- 虹色チキンもゲーム開始時に出現させる ---
+  spawnRainbowChicken();
+  // 5分後に再出現するタイマーもセット
+  scheduleRainbowChickenRespawn();
 }
 
 // --- NPCの動作・管理を毎フレーム処理 ---
@@ -2090,4 +2094,14 @@ function maintainNPCs() {
   // --- ここに他のNPCの管理処理を追加可 ---
   // 例: 車や飛行機などのNPCがあればここで移動やAI処理を行う
   // for (const npc of npcs) { ... }
+}
+
+// --- 鶏をまとめて出現させる関数 ---
+function spawnChickens() {
+  for (let i = 0; i < CHICKEN_COUNT; i++) {
+    const chicken = createChicken();
+    chicken.position.copy(randomChickenPosition());
+    chickens.push(chicken);
+    scene.add(chicken);
+  }
 }
