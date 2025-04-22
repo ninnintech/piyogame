@@ -2191,6 +2191,22 @@ async function startGame() {
         initGraphics();
     }
 
+    // 地形・オブジェクト・プレイヤー鳥を必ず生成
+    if (typeof createTerrain === 'function') {
+        createTerrain();
+    }
+    if (typeof placeObjects === 'function') {
+        placeObjects();
+    }
+    if (typeof setupPlayerBird === 'function') {
+        setupPlayerBird();
+    }
+
+    // 3Dスティック（ジョイスティックUI）表示
+    if (typeof showJoystick === 'function') {
+        showJoystick();
+    }
+
     // アニメーションループ開始（必ず呼ぶ）
     if (typeof animate === 'function') {
         requestAnimationFrame(animate);
