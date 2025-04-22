@@ -1498,9 +1498,19 @@ function updateInfo() {
     if (scoreElement) {
         scoreElement.textContent = score;
     }
+    // ライフ表示
+    const lifeElement = document.getElementById('life');
+    if (lifeElement) {
+        lifeElement.textContent = `ライフ: ${hp}`;
+    }
+    // アクティブユーザー数表示
+    const activeUsersElement = document.getElementById('active-users');
+    if (activeUsersElement) {
+        activeUsersElement.textContent = `アクティブユーザー数: ${userCount}`;
+    }
     // 詳細情報 (オプション)
     if (infoDiv) {
-        infoDiv.innerHTML = `スコア: <b style="color: #ffd700;">${score}</b><br>体力: <b style="color: ${hp > 2 ? '#90ee90' : '#ff6b6b'};">${hp}</b> / ${MAX_HP}<br>接続: <b>${userCount}</b>`;
+        infoDiv.innerHTML = `スコア: <b style=\"color: #ffd700;\">${score}</b><br>体力: <b style=\"color: ${hp > 2 ? '#90ee90' : '#ff6b6b'};\">${hp}</b> / ${MAX_HP}<br>接続: <b>${userCount}</b>`;
     }
 }
 
