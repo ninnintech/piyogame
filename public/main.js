@@ -834,11 +834,11 @@ function createChicken(isGold = false) {
 
 
 function randomChickenPosition() {
-    // X,Z: 中心±TERRAIN_SIZE*0.4, Y: 40〜80の空中
-    const x = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
-    const z = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
-    const y = 40 + Math.random() * 40;
-    return new THREE.Vector3(x, y, z);
+  // X,Z: 中心±TERRAIN_SIZE*0.4, Y: 40〜80の空中
+  const x = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
+  const z = (Math.random() - 0.5) * TERRAIN_SIZE * 0.8;
+  const y = 40 + Math.random() * 40;
+  return new THREE.Vector3(x, y, z);
 }
 
 function spawnChickens() {
@@ -1601,7 +1601,7 @@ async function setupRealtimeConnection() {
 const updatePresenceInfo = async () => {
     try {
         const members = await channel.presence.get();
-        // 修正: membersが配列でない場合の防御
+        console.log('Ably presence.get() result:', members, Array.isArray(members));
         if (!Array.isArray(members)) {
             console.error("Presence情報取得エラー: membersが配列ではありません", members);
             userCount = 0;
@@ -1952,6 +1952,8 @@ function setupInput() {
             upBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = 1; console.log('up-btn mousedown', move); });
             upBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseup', move); });
             upBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === 1) move.up = 0; console.log('up-btn mouseleave', move); });
+        } else {
+            console.warn('up-btn not found');
         }
         if (downBtn) {
             downBtn.addEventListener('touchstart', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn touchstart', move); });
@@ -1959,7 +1961,10 @@ function setupInput() {
             downBtn.addEventListener('mousedown', (e) => { e.preventDefault(); move.up = -1; console.log('down-btn mousedown', move); });
             downBtn.addEventListener('mouseup', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseup', move); });
             downBtn.addEventListener('mouseleave', (e) => { e.preventDefault(); if (move.up === -1) move.up = 0; console.log('down-btn mouseleave', move); });
+        } else {
+            console.warn('down-btn not found');
         }
+        console.log('setupInput: event listeners registered');
     }
 
     // ボタン入力 (タッチとマウス)
@@ -2093,7 +2098,7 @@ document.addEventListener('visibilitychange', () => {
          if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp }); // 再入室
         if (bgm && bgm.paused) bgm.play().catch(()=>{}); // BGM再開
     }
-});
+};
 
 // ページを閉じる/移動する前の処理
 window.addEventListener('beforeunload', () => {
@@ -2301,7 +2306,6 @@ function updateAircrafts(deltaTime) {
             if (a.children[3]) a.children[3].rotation.x = now * 40; // テールローター
         }
     }
-}
 
 
 function updateProjectiles() {
