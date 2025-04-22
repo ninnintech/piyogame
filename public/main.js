@@ -2091,15 +2091,13 @@ document.addEventListener('visibilitychange', () => {
     } else {
         // フォアグラウンドに戻った時
         if (ably && ably.connection.state !== 'connected') {
-             // 再接続処理が必要な場合
-             // setupRealtimeConnection(); // 再初期化 or
-             // ably.connection.connect();
+            // 再接続処理
         }
          if (channel) channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp }); // 再入室
         if (bgm && bgm.paused) bgm.play().catch(()=>{}); // BGM再開
     }
-};
 
+});
 // ページを閉じる/移動する前の処理
 window.addEventListener('beforeunload', () => {
     if (channel) channel.presence.leave(); // 必ず離脱
