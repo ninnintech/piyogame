@@ -1729,26 +1729,54 @@ function animate() {
     if (typeof dashActive !== 'undefined' && dashActive) speed *= 3.0;
     // 旋回慣性用変数
     if (typeof turnSpeed === 'undefined') window.turnSpeed = 0;
-    const TURN_ACCEL = 0.004;
-    const TURN_DECAY = 0.92;
-    const TURN_MAX = 0.034;
+
+    // --- 旋回速度の調整パラメータ ---
+    // const TURN_ACCEL = 0.004; // 元の値
+    // const TURN_DECAY = 0.92;  // 元の値 (一旦変更しない)
+    // const TURN_MAX = 0.034;   // 元の値
+
+    // ↓↓↓ 調整後の値 (例) ↓↓↓
+    const TURN_ACCEL = 0.001;  // 加速度を小さくする (例: 元の1/4)
+    const TURN_DECAY = 0.92;   // 減衰は一旦そのまま (好みで 0.95 など1に近づけても良い)
+    const TURN_MAX = 0.01;    // 最大速度をかなり小さくする (例: 元の約1/3以下)
+    // ↑↑↑ 調整後の値 (例) ↑↑↑
+
+
+    // --- 旋回速度の計算 ---
     if (move.turn !== 0) {
+      // 入力方向に加速
       window.turnSpeed += move.turn * TURN_ACCEL;
+      // 最大速度を超えないように制限
       if (window.turnSpeed > TURN_MAX) window.turnSpeed = TURN_MAX;
       if (window.turnSpeed < -TURN_MAX) window.turnSpeed = -TURN_MAX;
     } else {
+      // 入力がない場合は減衰
       window.turnSpeed *= TURN_DECAY;
-      if (Math.abs(window.turnSpeed) < 0.0005) window.turnSpeed = 0;
+      // 速度が非常に小さくなったら停止させる (閾値も調整すると良いかも)
+      if (Math.abs(window.turnSpeed) < 0.0001) window.turnSpeed = 0; // 例: 閾値を小さくする
     }
+
+    // --- birdオブジェクトへの適用 ---
     if (typeof bird !== 'undefined') {
-      bird.rotation.y -= window.turnSpeed;
+      // Y軸回転 (旋回)
+      bird.rotation.y -= window.turnSpeed; // 符号が逆なら += に変更
+
+      // --- 位置更新 (変更なし) ---
       const dir = new THREE.Vector3(Math.sin(bird.rotation.y), 0, Math.cos(bird.rotation.y));
       bird.position.addScaledVector(dir, move.forward * speed);
       bird.position.y += move.up * 0.13;
-      bird.position.x = Math.max(-TERRAIN_SIZE/2+2, Math.min(TERRAIN_SIZE/2-2, bird.position.x));
-      bird.position.y = Math.max(2, Math.min(80, bird.position.y));
-      bird.position.z = Math.max(-TERRAIN_SIZE/2+2, Math.min(TERRAIN_SIZE/2-2, bird.position.z));
-      // 衝突判定と多重補正（最大10回）
+
+      // --- 移動範囲制限 (変更なし) ---
+      // 変数 TERRAIN_SIZE が定義されている前提
+      const HALF_TERRAIN = (typeof TERRAIN_SIZE !== 'undefined' ? TERRAIN_SIZE : 200) / 2; // TERRAIN_SIZE がない場合のデフォルト値
+      const BORDER_MARGIN = 2;
+      const MIN_Y = 2;
+      const MAX_Y = 80;
+
+      bird.position.x = Math.max(-HALF_TERRAIN + BORDER_MARGIN, Math.min(HALF_TERRAIN - BORDER_MARGIN, bird.position.x));
+      bird.position.y = Math.max(MIN_Y, Math.min(MAX_Y, bird.position.y));
+      bird.position.z = Math.max(-HALF_TERRAIN + BORDER_MARGIN, Math.min(HALF_TERRAIN - BORDER_MARGIN, bird.position.z));
+    }      // 衝突判定と多重補正（最大10回）
       let fixCount = 0;
       while (fixCount < 10) {
         const collision = checkCollision(bird.position, 2);
