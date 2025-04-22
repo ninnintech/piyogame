@@ -1093,7 +1093,7 @@ function randomBigHeartPosition() {
     // 条件: 地形が見つかり、高さが範囲内で、かつ水面(y<2など)でない
   } while ((y < 8 || y > 35 || y < 2) && tries < 20);
 
-  // もし適切な場所が見つからなければデフォルト位置
+  // もし適切な場所が見つからなかったらデフォルト位置
   if (tries >= 20) return new THREE.Vector3(0, 20, 0);
 
   return new THREE.Vector3(x, y + 3.5, z); // 地表から少し浮かせる
@@ -1430,7 +1430,7 @@ function updateDash() {
                     const colIdx = collisionObjects.findIndex(co => co.object === chicken);
                     if (colIdx > -1) collisionObjects.splice(colIdx, 1);
                     chickens.splice(i, 1);
-                    // TODO: リスポーン
+                    // TODO: 鶏のリスポーン処理を追加？
                }
            }
            // 虹色チキンへの体当たり
@@ -1597,55 +1597,64 @@ async function setupRealtimeConnection() {
     await channel.presence.enter({ id: myId, name: myName, color: myColor, score: score, hp: hp });
     console.log("Presence Enter 完了");
 
-    // 在室メンバー取得とUI更新
-    const updatePresenceInfo = async () => {
-        try {
-            const members = await channel.presence.get();
-            userCount = Array.isArray(members) ? members.length : 0;
-            updateInfo(); // 接続人数表示更新
+// 在室メンバー取得とUI更新
+const updatePresenceInfo = async () => {
+    try {
+        const members = await channel.presence.get();
+        // 修正: membersが配列でない場合の防御
+        if (!Array.isArray(members)) {
+            console.error("Presence情報取得エラー: membersが配列ではありません", members);
+            userCount = 0;
+            updateInfo();
+            return;
+        }
+        userCount = members.length;
+        updateInfo(); // 接続人数表示更新
 
-            // 既存ピアの更新と新規ピアの追加
-            const currentPeerIds = new Set(Object.keys(peers));
-            for (const member of members) {
-                 if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
+        // 既存ピアの更新と新規ピアの追加
+        const currentPeerIds = new Set(Object.keys(peers));
+        for (const member of members) {
+            if (!member || typeof member !== 'object') continue;
+            if (member.clientId === ably.auth.clientId) continue; // 自分は無視 (myId比較が望ましい場合あり)
 
-                const state = member.data; // Presence data を使う
-                if (!state) continue; // データがない場合はスキップ
+            const state = member.data; // Presence data を使う
+            if (!state) continue; // データがない場合はスキップ
 
-                if (!peers[state.id]) { // 新規ピア
-                   console.log(`新規ピア参加: ${state.name}(${state.id})`);
-                   peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
-                   scene.add(peers[state.id].group);
-                } else { // 既存ピアの情報更新
-                    const peer = peers[state.id];
-                    peer.group.position.set(state.x || 0, state.y || 10, state.z || 0); // 位置も同期？
-                    peer.group.rotation.y = state.ry || 0; // 回転も同期？
-                    setBirdColor(peer.group, state.color || '#ffffff');
-                    peer.name = state.name || '???';
-                    peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
-                    peer.score = typeof state.score === 'number' ? state.score : 0;
-                    if (peer.nameObj) {
-                         peer.nameObj.nameSpan.textContent = peer.name;
-                         updateHeartDisplay(peer.nameObj, peer.hp);
-                    }
-                    peer.group.visible = peer.hp > 0; // HPが0なら非表示
+            if (!peers[state.id]) { // 新規ピア
+                console.log(`新規ピア参加: ${state.name}(${state.id})`);
+                peers[state.id] = createPeerBird(state); // createPeerBirdはstateを引数に取る
+                scene.add(peers[state.id].group);
+            } else { // 既存ピアの情報更新
+                const peer = peers[state.id];
+                peer.group.position.set(state.x || 0, state.y || 10, state.z || 0); // 位置も同期？
+                peer.group.rotation.y = state.ry || 0; // 回転も同期？
+                setBirdColor(peer.group, state.color || '#ffffff');
+                peer.name = state.name || '???';
+                peer.hp = typeof state.hp === 'number' ? state.hp : MAX_HP;
+                peer.score = typeof state.score === 'number' ? state.score : 0;
+                if (peer.nameObj) {
+                    peer.nameObj.nameSpan.textContent = peer.name;
+                    updateHeartDisplay(peer.nameObj, peer.hp);
                 }
-                currentPeerIds.delete(state.id); // 処理済みピアIDをセットから削除
+                peer.group.visible = peer.hp > 0; // HPが0なら非表示
             }
+            currentPeerIds.delete(state.id); // 処理済みピアIDをセットから削除
+        }
 
-            // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
-            // presenceにいなくなったがpeersに残っているピアを削除
-            for (const oldPeerId of currentPeerIds) {
+        // Presenceにはいるがpeersにいない場合（エラーケース）はログ表示
+        // presenceにいなくなったがpeersに残っているピアを削除
+        for (const oldPeerId of currentPeerIds) {
+            if (peers[oldPeerId]) {
                 console.log(`ピア退出: ${peers[oldPeerId].name}(${oldPeerId})`);
                 removePeer(oldPeerId);
             }
-            updateRanking(); // ランキング更新
-
-        } catch (err) {
-            console.error("Presence情報の取得/更新エラー:", err);
         }
-    };
+        updateRanking(); // ランキング更新
 
+    } catch (err) {
+        console.error("Presence情報の取得/更新エラー:", err);
+    }
+};
     // 定期的に Presence 情報で同期 (例: 5秒ごと)
     setInterval(updatePresenceInfo, 5000);
     await updatePresenceInfo(); // 初回実行
