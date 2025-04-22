@@ -510,7 +510,6 @@ function placeObjects() {
         aircrafts.push(heli);
         addCollisionObject(heli, 3.5); // 衝突半径調整
     }
-}
 
 
 // --- 鳥モデル生成 (共通化) ---
