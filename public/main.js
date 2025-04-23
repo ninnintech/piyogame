@@ -1538,18 +1538,28 @@ function launchOnlineMissile(ownerId, position, direction) {
 // ミサイルオブジェクトを作成
 function createMissile(position, direction) {
   // --- Double the hitbox size: make missile visually larger and hitbox bigger ---
-  const geometry = new THREE.CylinderGeometry(0.2, 0.2, 1.6, 8); // doubled radius and length
+  const geometry = new THREE.CylinderGeometry(0.3, 0.3, 2.0, 16); // さらに大きく、セグメント増
   geometry.rotateX(Math.PI / 2);
   const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-  
+  material.transparent = false;
+  material.opacity = 1;
+
   const mesh = new THREE.Mesh(geometry, material);
-  
+
   mesh.position.copy(position);
   mesh.position.y += 0.5; // 少し上から発射
-  
+
   // 方向に合わせて回転
   mesh.lookAt(position.clone().add(direction));
-  
+
+  // デバッグ: 生成直後の状態を出力
+  console.log('[missile debug] created', {
+    pos: mesh.position.toArray(),
+    dir: direction.toArray(),
+    visible: mesh.visible,
+    opacity: material.opacity
+  });
+
   return {
     mesh,
     direction: direction.clone(),
